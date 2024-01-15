@@ -1,0 +1,11 @@
+/////////////////////////////////////////////////////////////////
+#pragma comment(lib, "metamalloc_simple_heap_pow2.lib")
+/////////////////////////////////////////////////////////////////
+
+#include "../benchmark.h"
+
+int main (int argc, char* argv[])
+{
+    run_benchmark(argc, argv);
+    return 0;
+}

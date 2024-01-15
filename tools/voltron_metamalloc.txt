@@ -1,0 +1,140 @@
+# Used by voltron.py
+# Comments start with hash , but there are 3 exceptions : #include #ifdef #endif 
+# First 3 lines are mandatory : source_path output_header and namespace
+# Then they have to be followed by [HEADER] [SYSTEM_LIBRARIES] and then [INCLUSIONS]
+# All inclusions in your source files will be ignored. Therefore SYSTEM_LIBRARIES shall have all you need.
+source_path=../src/
+output_header=metamalloc.h
+# Namespace is optional / you can leave it as blank
+namespace=metamalloc
+####################################################
+[HEADER]
+/*
+	METAMALLOC VERSION 1.0.0
+
+	MIT License
+
+	Copyright (c) 2024 Akin Ocal
+
+	Permission is hereby granted, free of charge, to any person obtaining a copy
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+
+	The above copyright notice and this permission notice shall be included in all
+	copies or substantial portions of the Software.
+
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+	SOFTWARE.
+*/
+####################################################
+[SYSTEM_LIBRARIES]
+# THE PARTS BELOW WILL BE COPIED AS IS TO THE BEGINNING OF THE GENERATED FILE
+####################################################
+// STD C
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <cstdarg>
+#include <cmath>
+#include <cassert>
+#include <cstring>
+#include <cstdlib>
+// STD
+#include <type_traits>
+#include <array>
+#include <string_view>
+#include <new>
+// CPU INTRINSICS
+#include <immintrin.h>
+#if defined(_MSC_VER)
+#include <intrin.h>
+#elif defined(__GNUC__)
+#include <emmintrin.h>
+#endif
+// LINUX
+#ifdef __linux__
+#include <unistd.h>
+#include <sys/mman.h>
+#include <pthread.h>
+#include <sched.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#ifdef ENABLE_NUMA
+#include <numa.h>		
+#include <numaif.h>			
+#endif
+#endif
+// STATS
+#ifdef ENABLE_STATS
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#endif
+#if defined(ENABLE_PERF_TRACES) || defined(ENABLE_REPORT_LEAKS)
+#include <cstdio>
+#endif
+// WINDOWS
+#ifdef _WIN32
+#include <windows.h>
+#include <fibersapi.h>
+#endif
+// UNIT TESTS
+#ifdef UNIT_TEST
+#include <string>
+#include <cstdio>
+#endif
+####################################################
+[INCLUSIONS]
+# LIST OF FILES , ORDER MATTERS AS THEY MAY HAVE INTERNAL DEPDENCIES :
+####################################################
+#CHECKS FIRST
+compiler/checks.h
+cpu/architecture_check.h
+os/os_check.h
+#THEN THE REST
+#COMPILER LAYER
+compiler/builtin_functions.h
+compiler/hints_branch_predictor.h
+compiler/hints_hot_code.h
+compiler/packed.h
+compiler/unused.h
+#CPU LAYER
+cpu/alignment_constants.h
+cpu/pause.h
+cpu/trampoline.h
+#OS LAYER
+os/virtual_memory.h
+os/thread_local_storage.h
+os/thread_utilities.h
+os/lock.h
+os/environment_variable.h
+os/trace.h
+#UTILITIES LAYER
+utilities/alignment_checks.h
+utilities/log2_utilities.h
+utilities/pow2_utilities.h
+utilities/modulo_utilities.h
+utilities/multiple_utilities.h
+utilities/size_utilities.h
+utilities/userspace_spinlock.h
+utilities/lockable.h
+#ALLOCATOR LAYER
+arena_base.h
+arena.h
+logical_page_header.h
+logical_page_base.h
+logical_page.h
+logical_page_anysize.h
+deallocation_queue.h
+segment.h
+heap_base.h
+scalable_allocator.h
