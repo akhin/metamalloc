@@ -14,15 +14,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string_view>
-#include <mutex> // For std::lock_guard
 #include <malloc.h> // For malloc_usable_size and _msize
 #include <new> // std::get_new_handler
+#include <mutex> // For std::lock_guard
 
 #include "compiler/builtin_functions.h"
 #include "compiler/unused.h"
 #include "os/thread_local_storage.h"
 #include "utilities/userspace_spinlock.h"
-#include "utilities/http_reactor.h"
+#include "utilities/http_cpr_reactor.h"
 #include "utilities/log2_utilities.h"
 #include "utilities/pow2_utilities.h"
 
@@ -425,17 +425,10 @@ static const char* HTTPLiveProfilerHtmlSource = R"(
 /////////////////////////////////////////////////////////////
 // HTTP LIVE PROFILER
 
-class HTTPLiveProfiler : public HTTPReactor<HTTPLiveProfiler>
+class HTTPLiveProfiler : public HTTPCPRReactor<HTTPLiveProfiler>
 {
     public:
-
-        HTTPLiveProfiler()
-        {
-            // WE IMPLEMENT POST REQUESTS USING AJAX'S XMLHttpRequest. THEREFORE THERE IS NO WAY TO REUSE AN EXISTING TCP CONNECTION
-            // https://stackoverflow.com/questions/32505128/how-to-make-xmlhttprequest-reuse-a-tcp-connection
-            this->m_connection_per_request = true;
-        }
-
+        HTTPLiveProfiler() =default;
         ~HTTPLiveProfiler() = default;
         HTTPLiveProfiler(const HTTPLiveProfiler& other) = delete;
         HTTPLiveProfiler& operator= (const HTTPLiveProfiler& other) = delete;
@@ -451,7 +444,7 @@ class HTTPLiveProfiler : public HTTPReactor<HTTPLiveProfiler>
             response.set_body(HTTPLiveProfilerHtmlSource);
 
             auto response_text = response.get_as_text();
-            connector_socket->send(response_text.c_str());
+            connector_socket->send(response_text.c_str(), response_text.length());
         }
 
         void on_http_post_request(const HttpRequest& http_request, Socket<SocketType::TCP>* connector_socket)
@@ -464,7 +457,7 @@ class HTTPLiveProfiler : public HTTPReactor<HTTPLiveProfiler>
             response.set_body(m_post_response_buffer);
 
             auto response_text = response.get_as_text();
-            connector_socket->send(response_text.c_str());
+            connector_socket->send(response_text.c_str(), response_text.length());
         }
 
         void on_http_put_request(const HttpRequest& http_request, Socket<SocketType::TCP>* connector_socket)

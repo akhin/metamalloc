@@ -150,7 +150,7 @@ int main()
                 current_allocation.size_class = static_cast<uint16_t>(allocation_size);
 
                 allocation_buckets[allocation_bucket_index][i] = current_allocation;
-                ConcurrencyTestUtilities::sleep_randomly(3000);
+                ConcurrencyTestUtilities::sleep_randomly_usecs(3000);
             }
 
             // DEALLOCATIONS
@@ -170,7 +170,7 @@ int main()
                         }
                     }
 
-                    ConcurrencyTestUtilities::sleep_randomly(3000);
+                    ConcurrencyTestUtilities::sleep_randomly_usecs(3000);
                 }
 
                 if (remaining_deallocations == 0)

@@ -64,11 +64,11 @@ int main()
 
                     if (is_finishing.load() == true) { break; }
 
-                    memlive::ThreadUtilities::sleep(thread_wait_in_usecs);
+                    memlive::ThreadUtilities::sleep_in_microseconds(thread_wait_in_usecs);
                 }
             }
 
-            memlive::ThreadUtilities::sleep(thread_wait_in_usecs);
+            memlive::ThreadUtilities::sleep_in_microseconds(thread_wait_in_usecs);
         }
 
         for (auto ptr : pointers)

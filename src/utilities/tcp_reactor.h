@@ -10,10 +10,9 @@
 #include <vector>
 #include <memory>
 #include <thread>
-#include <mutex> // For std::lock_guard
 #include <unordered_map>
 #include "../os/socket.h"
-#include "../os/async_io.h"
+#include "../os/async_io_poller.h"
 #include "userspace_spinlock.h"
 
 template <typename SocketType>
@@ -115,15 +114,18 @@ class TcpReactor
             stop();
         }
 
-        bool start(const std::string& address, int port, int poll_timeout = TcpReactor::DEFAULT_POLL_TIMEOUT , int accept_timeout = TcpReactor::DEFAULT_ACCEPT_TIMEOUT, int pending_connection_queue_size = TcpReactor::DEFAULT_PENDING_CONNECTION_QUEUE_SIZE)
+        bool start(const std::string& address, int port, int poll_timeout_nanoseconds = TcpReactor::DEFAULT_POLL_TIMEOUT_NANOSECONDS , int accept_timeout_seconds = TcpReactor::DEFAULT_ACCEPT_TIMEOUT_SECONDS, int pending_connection_queue_size = TcpReactor::DEFAULT_PENDING_CONNECTION_QUEUE_SIZE)
         {
             m_is_stopping.store(false);
-            m_accept_timeout = accept_timeout;
+            m_accept_timeout_seconds = accept_timeout_seconds;
 
             m_acceptor_socket.create();
+            
+            m_acceptor_socket.ignore_sigpipe_signals();
+            
             m_acceptor_socket.set_pending_connections_queue_size(pending_connection_queue_size);
 
-            m_acceptor_socket.set_socket_option(SocketOption::REUSE_ADDRESS, 1);
+            m_acceptor_socket.set_socket_option(SocketOptionLevel::SOCKET, SocketOption::REUSE_ADDRESS, 1);
 
             if (!m_acceptor_socket.bind(address, port))
             {
@@ -137,8 +139,7 @@ class TcpReactor
 
             m_acceptor_socket.set_blocking_mode(false);
 
-            m_asio_reader.start();
-            m_asio_reader.set_timeout(poll_timeout*1000000);
+            m_asio_reader.set_timeout(poll_timeout_nanoseconds);
             m_asio_reader.add_descriptor(m_acceptor_socket.get_socket_descriptor());
 
             m_reactor_thread.reset( new std::thread(&TcpReactor::reactor_thread, this) );
@@ -154,7 +155,7 @@ class TcpReactor
 
                 std::lock_guard<UserspaceSpinlock<>> lock(m_lock);
 
-                m_asio_reader.stop();
+                m_asio_reader.clear_descriptors();
 
                 if (m_reactor_thread.get() != nullptr)
                 {
@@ -178,7 +179,7 @@ class TcpReactor
 
                 int result = 0;
 
-                if constexpr(AsyncIO<>::polls_per_socket() == false)
+                if constexpr(AsyncIOPoller<>::polls_per_socket() == false)
                 {
                     result = m_asio_reader.get_number_of_ready_events();
                 }
@@ -189,7 +190,7 @@ class TcpReactor
 
                 if (result > 0)
                 {
-                    if constexpr (AsyncIO<>::polls_per_socket() == false)
+                    if constexpr (AsyncIOPoller<>::polls_per_socket() == false)
                     {
                         for (int counter{ 0 }; counter < result; counter++)
                         {
@@ -207,10 +208,6 @@ class TcpReactor
                                     on_data_ready(peer_index);
                                 }
                             }
-                            else
-                            {
-                                on_client_disconnected(peer_index);
-                            }
                         }
                     }
                     else
@@ -221,7 +218,7 @@ class TcpReactor
                         }
 
                         auto peer_count = m_connectors.get_capacity();
-                        for (int counter{ 0 }; counter < peer_count; counter++)
+                        for (int counter{ 0 }; counter < static_cast<int>(peer_count); counter++)
                         {
                             if (m_asio_reader.is_descriptor_ready(m_connectors.get_socket_descriptor(counter)))
                             {
@@ -243,7 +240,7 @@ class TcpReactor
             std::size_t connector_index{ 0 };
 
             Socket<SocketType::TCP>* connector_socket = nullptr;
-            connector_socket = m_acceptor_socket.accept(m_accept_timeout);
+            connector_socket = m_acceptor_socket.accept(m_accept_timeout_seconds);
 
             if (connector_socket)
             {
@@ -261,8 +258,8 @@ class TcpReactor
             return m_acceptor_socket;
         }
 
-        constexpr static int inline DEFAULT_POLL_TIMEOUT = 5;
-        constexpr static int inline DEFAULT_ACCEPT_TIMEOUT = 5;
+        constexpr static int inline DEFAULT_POLL_TIMEOUT_NANOSECONDS = 5;
+        constexpr static int inline DEFAULT_ACCEPT_TIMEOUT_SECONDS = 5;
         constexpr static int inline DEFAULT_PENDING_CONNECTION_QUEUE_SIZE = 32;
 
         void on_client_disconnected(std::size_t connector_index)
@@ -293,9 +290,9 @@ class TcpReactor
 
     private:
         std::unique_ptr<std::thread> m_reactor_thread;
-        int m_accept_timeout = -1;
+        int m_accept_timeout_seconds = -1;
         Socket<SocketType::TCP> m_acceptor_socket;
-        AsyncIO<> m_asio_reader;
+        AsyncIOPoller<> m_asio_reader;
         std::atomic<bool> m_is_stopping = false;
         UserspaceSpinlock<> m_lock;
         TcpReactorImplementation& derived_class_implementation() { return *static_cast<TcpReactorImplementation*>(this); }

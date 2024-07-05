@@ -25,7 +25,7 @@ set "DLL_TU_NAME=metamalloc_simple_heap_pow2"
 del %DLL_TU_NAME%.dll
 del %DLL_TU_NAME%.lib
 
-cl /c /EHsc /I"../../" /I"../../examples/" /DDLL_EXPORTS /MD  /std:c++17 /O2 %DLL_TU_NAME%.cpp
+cl /c /EHsc /I"../../" /I"../../examples/" /DDLL_EXPORTS /MD  /std:c++17 /D NDEBUG /O2 %DLL_TU_NAME%.cpp
 link /DEFAULTLIB:Advapi32.lib /DLL /OUT:%DLL_TU_NAME%.dll %DLL_TU_NAME%.obj
 del %DLL_TU_NAME%.exp
 del %DLL_TU_NAME%.obj
@@ -46,7 +46,7 @@ REM ----------------------------------------------------------------------------
 REM SAMPLE APP
 set "EXECUTABLE_TU_NAME=sample_app"
 del %EXECUTABLE_TU_NAME%.exe
-cl.exe /EHsc /I"../../" /I"../../examples" /std:c++17 /O2 %EXECUTABLE_TU_NAME%.cpp /Fe:%EXECUTABLE_TU_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
+cl.exe /EHsc /I"../../" /I"../../examples" /std:c++17 /D NDEBUG /O2 %EXECUTABLE_TU_NAME%.cpp /Fe:%EXECUTABLE_TU_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
 
 del %EXECUTABLE_TU_NAME%.obj
 del vc140.pdb

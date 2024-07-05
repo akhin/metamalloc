@@ -15,13 +15,13 @@ CFLAGS= $(INCLUDE_DIRS) -std=c++2a -c
 LFLAGS= -lstdc++ -pthread
 
 #Release mode
-release: CFLAGS +=  -O3
+release: CFLAGS +=  -DNDEBUG -O3
 release: all
 
 all: $(OBJECTS) $(EXECUTABLE)
 
 $(EXECUTABLE) : $(OBJECTS)
-		$(CXX) $(LFLAGS) $(OBJECTS) -o $@ 
+		$(CXX) $(OBJECTS) $(LFLAGS) -o $@ 
 
 .cpp.o: *.h
 	$(CXX) $(CFLAGS) $< -o $@

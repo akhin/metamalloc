@@ -20,21 +20,21 @@ color 0E
 set "TRANSLATION_UNIT_NAME=benchmark_ucrt"
 del %TRANSLATION_UNIT_NAME%.exe
 REM Build the C++ file using MSVC, no O3 in MSVC
-cl.exe /EHsc /I"../../examples" /I"../../../" /std:c++17 /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
+cl.exe /EHsc /I"../../examples" /I"../../../" /std:c++17 /D NDEBUG /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
 REM Delete the object file generated during compilation
 del %TRANSLATION_UNIT_NAME%.obj
 
 set "TRANSLATION_UNIT_NAME=benchmark_metamalloc"
 del %TRANSLATION_UNIT_NAME%.exe
 REM Build the C++ file using MSVC, no O3 in MSVC
-cl.exe /EHsc /I"../../examples" /I"../../../" /std:c++17 /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
+cl.exe /EHsc /I"../../examples" /I"../../../" /std:c++17 /D NDEBUG /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
 REM Delete the object file generated during compilation
 del %TRANSLATION_UNIT_NAME%.obj
 
 set "TRANSLATION_UNIT_NAME=benchmark_inteltbb"
 del %TRANSLATION_UNIT_NAME%.exe
 REM Build the C++ file using MSVC, no O3 in MSVC
-cl.exe /EHsc /I"C:\Program Files (x86)\Intel\oneAPI\tbb\latest\include" /I"../../examples" /I"../../../" /std:c++17 /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
+cl.exe /EHsc /I"C:\Program Files (x86)\Intel\oneAPI\tbb\latest\include" /I"../../examples" /I"../../../" /std:c++17 /D NDEBUG /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
 REM Delete the object file generated during compilation
 del %TRANSLATION_UNIT_NAME%.obj
 

@@ -10,7 +10,7 @@ namespace=metamalloc
 ####################################################
 [HEADER]
 /*
-	METAMALLOC VERSION 1.0.0
+	METAMALLOC VERSION 1.0.1
 
 	MIT License
 

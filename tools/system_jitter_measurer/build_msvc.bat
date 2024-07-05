@@ -20,7 +20,7 @@ REM Set the console color to yellow
 color 0E
 
 REM Build the C++ file using MSVC
-cl.exe /EHsc /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console
+cl.exe /EHsc /D NDEBUG /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console
 
 
 REM Delete the object file generated during compilation

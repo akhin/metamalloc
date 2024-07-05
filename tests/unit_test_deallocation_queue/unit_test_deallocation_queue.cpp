@@ -123,7 +123,7 @@ int main()
                 {
                     auto ptr = malloc(8);
                     q.push(ptr);
-                    ConcurrencyTestUtilities::sleep_randomly(5000);
+                    ConcurrencyTestUtilities::sleep_randomly_usecs(5000);
                 }
             }
         };

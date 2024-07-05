@@ -10,7 +10,7 @@ namespace=memlive
 ####################################################
 [HEADER]
 /*
-	MEMLIVE 1.0.0
+	MEMLIVE 1.0.1
 
 	MIT License
 
@@ -56,20 +56,18 @@ namespace=memlive
 // STD
 #include <string>
 #include <string_view>
-#include <algorithm>
 #include <array>
 #include <vector>
 #include <unordered_map>
-#include <sstream>
-#include <fstream>
-#include <iomanip>
 #include <thread>
 #include <atomic>
+#include <iomanip>
 #include <memory>
-#include <mutex> // For std::lock_guard
 #include <type_traits>
+#include <mutex> // For std::lock_guard
 #ifdef __linux__
 #include <string.h>
+#include <csignal>
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
@@ -83,6 +81,7 @@ namespace=memlive
 #include <sys/epoll.h>
 #include <sys/sysinfo.h>
 #include <sys/mman.h>
+#include <linux/version.h>
 #endif
 #ifdef _WIN32
 #include <Ws2tcpip.h>
@@ -106,7 +105,7 @@ compiler/unused.h
 cpu/pause.h
 #OS LAYER
 os/socket.h
-os/async_io.h
+os/async_io_poller.h
 os/lock.h
 os/thread_utilities.h
 os/thread_local_storage.h
@@ -115,6 +114,6 @@ utilities/log2_utilities.h
 utilities/pow2_utilities.h
 utilities/userspace_spinlock.h
 utilities/tcp_reactor.h
-utilities/http_reactor.h
+utilities/http_cpr_reactor.h
 #
 profiler.h

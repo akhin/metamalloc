@@ -6,7 +6,7 @@
                 static bool is_hyper_threading()
 
                 static inline void yield()
-                static inline void sleep(unsigned long microseconds)
+                static inline void sleep_in_microseconds(unsigned long microseconds)
 
                 static int get_current_core_id()
                 static unsigned long get_current_thread_id()
@@ -24,6 +24,7 @@
 #include <sched.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 #elif _WIN32            // VOLTRON_EXCLUDE
 #include <windows.h>
 #endif                    // VOLTRON_EXCLUDE
@@ -162,16 +163,24 @@ class ThreadUtilities
             #endif
         }
 
-        static inline void sleep(unsigned long microseconds)
+        static inline void sleep_in_microseconds(unsigned long microseconds)
         {
             #ifdef __linux__
             usleep(microseconds);
             #elif _WIN32
-            // In Windows , you can sleep in terms of milliseconds...
-            auto iterations = microseconds / 1000;
-            for (unsigned long i{ 0 }; i < iterations; i++)
+            // In Windows , the sleep granularity is 1 millisecond , therefore min wait will be 1000 microsecs
+            if (microseconds < 1000)
             {
                 Sleep(1);
+                return;
+            }
+            else
+            {
+                auto iterations = microseconds / 1000;
+                for (unsigned long i{ 0 }; i < iterations; i++)
+                {
+                    Sleep(1);
+                }
             }
             #endif
         }

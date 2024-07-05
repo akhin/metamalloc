@@ -1,6 +1,14 @@
-// A SUPER BASIC HTTP REACTOR. IT COPIES DATA ( NO ZERO COPY ) FOR HTTPRequest STRUCTS
-#ifndef __HTTP_REACTOR_H__
-#define __HTTP_REACTOR_H__
+/* 
+    CPR : Connection per request
+
+    ITS PARSER ONLY HANDLES CONNECTION-PER-REQUEST MODEL WHERE THERE WILL BE ONE UNIQUE TCP CONNECTION PER HTTP REQUEST
+    THEREFORE THE PARSER DOES NOT CONSIDER INCOMPLETE BYTES 
+	
+	USE CASE :   IN SIMPLE HTTP APPS AJAX'S XMLHttpRequest FOR POST REQUEST , YOU CAN NOT REUSE AN EXISTING TCP CONNECTION
+				 Https://stackoverflow.com/questions/32505128/how-to-make-xmlhttprequest-reuse-a-tcp-connection
+*/
+#ifndef __HTTP_CPR_REACTOR_H__
+#define __HTTP_CPR_REACTOR_H__
 
 #include <cstddef>
 #include <cassert>
@@ -71,61 +79,53 @@ class HttpResponse
         std::string m_body = "";
 };
 
-template <typename HTTPReactorImplementation>
-class HTTPReactor : public  TcpReactor<HTTPReactor<HTTPReactorImplementation>>
+template <typename HTTPCPRReactorImplementation>
+class HTTPCPRReactor : public  TcpReactor<HTTPCPRReactor<HTTPCPRReactorImplementation>>
 {
 public:
 
-    HTTPReactor()
+    HTTPCPRReactor()
     {
         m_cache.reserve(RECEIVE_SIZE);
     }
 
-    ~HTTPReactor() {}
-    HTTPReactor(const HTTPReactor& other) = delete;
-    HTTPReactor& operator= (const HTTPReactor& other) = delete;
-    HTTPReactor(HTTPReactor&& other) = delete;
-    HTTPReactor& operator=(HTTPReactor&& other) = delete;
+    ~HTTPCPRReactor() {}
+    HTTPCPRReactor(const HTTPCPRReactor& other) = delete;
+    HTTPCPRReactor& operator= (const HTTPCPRReactor& other) = delete;
+    HTTPCPRReactor(HTTPCPRReactor&& other) = delete;
+    HTTPCPRReactor& operator=(HTTPCPRReactor&& other) = delete;
 
     void on_data_ready(std::size_t peer_index)
     {
         auto peer_socket = this->m_connectors.get_connector_socket(peer_index);
         std::size_t received_bytes{ 0 };
 
-        while (true)
-        {
-            char read_buffer[RECEIVE_SIZE] = { 0 };
-            auto read = peer_socket->receive(read_buffer, RECEIVE_SIZE);
-            auto error = Socket<>::get_current_thread_last_socket_error();
+        char read_buffer[RECEIVE_SIZE] = { 0 };
+        auto read = peer_socket->receive(read_buffer, RECEIVE_SIZE);
 
-            if (read > 0)
-            {
-                received_bytes += read;
-                read_buffer[read] = '\0';
-                m_cache += read_buffer;
-                break;
-            }
-            else
-            {
-                if (received_bytes == 0)
-                {
-                    if (peer_socket->is_connection_lost(error, read, true))
-                    {
-                        on_client_disconnected(peer_index);
-                        break;
-                    }
-                    else if (error != 0)
-                    {
-                        this->on_socket_error(error, read);
-                        break;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
+        if (read > 0 && read <= static_cast<int>(RECEIVE_SIZE))
+        {
+            received_bytes += read;
+            read_buffer[read] = '\0';
+            m_cache += read_buffer;
         }
+		else 
+		{
+			auto error = Socket<>::get_current_thread_last_socket_error();
+			
+			if( read == 0)
+			{
+				on_client_disconnected(peer_index);
+			}
+			else if (peer_socket->is_connection_lost_during_receive(error))
+			{
+				on_client_disconnected(peer_index);
+			}           
+			else if (error != 0)
+			{
+				this->on_socket_error(error, read);
+			}
+		}
 
         if (received_bytes > 0)
         {
@@ -160,32 +160,28 @@ public:
             }
         }
 
-        if (m_connection_per_request)
-        {
-            // Meaning that there will a new TCP connection per HTTP request we are receiving we need to close the connection
-            peer_socket->close();
-            on_client_disconnected(peer_index);
-        }
+        peer_socket->close();
+        on_client_disconnected(peer_index);
     }
 
     void on_http_get_request(const HttpRequest& http_request, Socket<SocketType::TCP>* connector_socket)
     {
-        static_cast<HTTPReactorImplementation*>(this)->on_http_get_request(http_request, connector_socket);
+        static_cast<HTTPCPRReactorImplementation*>(this)->on_http_get_request(http_request, connector_socket);
     }
 
     void on_http_post_request(const HttpRequest& http_request, Socket<SocketType::TCP>* connector_socket)
     {
-        static_cast<HTTPReactorImplementation*>(this)->on_http_post_request(http_request, connector_socket);
+        static_cast<HTTPCPRReactorImplementation*>(this)->on_http_post_request(http_request, connector_socket);
     }
 
     void on_http_put_request(const HttpRequest& http_request, Socket<SocketType::TCP>* connector_socket)
     {
-        static_cast<HTTPReactorImplementation*>(this)->on_http_put_request(http_request, connector_socket);
+        static_cast<HTTPCPRReactorImplementation*>(this)->on_http_put_request(http_request, connector_socket);
     }
 
     void on_http_delete_request(const HttpRequest& http_request, Socket<SocketType::TCP>* connector_socket)
     {
-        static_cast<HTTPReactorImplementation*>(this)->on_http_delete_request(http_request, connector_socket);
+        static_cast<HTTPCPRReactorImplementation*>(this)->on_http_delete_request(http_request, connector_socket);
     }
 
     void on_client_connected(std::size_t peer_index)
@@ -195,7 +191,7 @@ public:
 
     void on_client_disconnected(std::size_t peer_index)
     {
-        TcpReactor<HTTPReactor>::on_client_disconnected(peer_index);
+        TcpReactor<HTTPCPRReactor>::on_client_disconnected(peer_index);
     }
 
     void on_async_io_error(int error_code, int event_result)
@@ -215,9 +211,6 @@ private:
     static inline constexpr std::size_t MAX_INCOMING_HTTP_REQUEST_COUNT = 32;
     std::string m_cache;
     std::size_t m_cache_index = 0;
-
-protected:
-    bool m_connection_per_request = false;
 
 private:
 

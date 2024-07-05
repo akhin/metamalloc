@@ -15,6 +15,8 @@ CLASSES:
 
         Console                                     console_output_with_colour
 
+        LinuxInfo                                   Linux kernel version & CPU Isolation info
+        
         PMCUtilities                                Intel Performance Counter Monitor values
                                                     Only on Linux , see "GETTING INTEL PMC VALUES" below
 
@@ -96,6 +98,8 @@ GETTING INTEL PMC VALUES ( ONLY ON LINUX : PMC ACCESS NEED KERNEL MODE PRIVILEGE
 #include <algorithm>
 #include <numeric>
 #include <random>
+#include <stdexcept>
+#include <cstdio>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -115,6 +119,7 @@ GETTING INTEL PMC VALUES ( ONLY ON LINUX : PMC ACCESS NEED KERNEL MODE PRIVILEGE
 #include <unistd.h>
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
+#include <linux/version.h>
 #endif
 
 ///////////////////////////////////////////////////////////////////
@@ -292,6 +297,52 @@ class Console
             }
         };
 };
+
+///////////////////////////////////////////////////////////////////
+// LinuxInfo
+#ifdef __linux__
+
+class LinuxInfo
+{
+    public:
+    
+        static const std::string get_linux_kernel_version()
+        {
+            std::string ret;
+            
+            unsigned int linux_version = LINUX_VERSION_CODE;
+            unsigned int major = (linux_version >> 16) & 0xFF;
+            unsigned int minor = (linux_version >> 8) & 0xFF;
+            unsigned int revision = linux_version & 0xFF;
+            
+            ret = std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(revision);
+            
+            return ret;
+        }
+        
+        static const std::string get_cpu_isolation_info()
+        {
+            std::string result;
+            std::array<char, 128> buffer;
+            
+            FILE* pipe = popen("sudo cat /proc/cmdline | grep --color=auto isolcpus=", "r");
+            if (!pipe) 
+            {
+                throw std::runtime_error("popen() failed!");
+            }
+            
+            while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) 
+            {
+                result += buffer.data();
+            }
+
+            pclose(pipe);
+
+            return result;
+        }
+};
+
+#endif
 
 ///////////////////////////////////////////////////////////////////
 // PMC Utilities

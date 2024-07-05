@@ -17,7 +17,7 @@
 
     OTHERS :
 
-        ConcurrencyTestUtilities                        sleep_randomly  pin_calling_thread_randomly thread_safe_print set_calling_thread_name
+        ConcurrencyTestUtilities                        sleep_randomly_usecs  pin_calling_thread_randomly thread_safe_print set_calling_thread_name
         RandomNumberGenerator::get_random_integer       use it to get random integers
         Console::console_output_with_colour             gives coloured output in consoles on Linux and Windows
 
@@ -27,6 +27,7 @@
 
 #include <cstdlib>
 #include <array>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -141,17 +142,25 @@ class ConcurrencyTestUtilities
 {
     public:
 
-        static void sleep_randomly(int max_duration_in_microsecs=0)
+        static void sleep_randomly_usecs(int max_duration_in_microsecs=0)
         {
             unsigned long microseconds = static_cast<unsigned long>(RandomNumberGenerator::get_random_integer(max_duration_in_microsecs));
             #ifdef __linux__
             usleep(microseconds);
             #elif _WIN32
-            // In Windows , you can sleep in terms of milliseconds...
-            auto iterations = microseconds / 1000;
-            for (unsigned long i{ 0 }; i < iterations; i++)
+            // In Windows , the sleep granularity is 1 millisecond , therefore min wait will be 1000 microsecs
+            if (microseconds < 1000)
             {
                 Sleep(1);
+                return;
+            }
+            else
+            {
+                auto iterations = microseconds / 1000;
+                for (unsigned long i{ 0 }; i < iterations; i++)
+                {
+                    Sleep(1);
+                }
             }
             #endif
         }
@@ -258,14 +267,15 @@ class UnitTest
         template <class T, class U>
         bool test_equals(T actual, U expected, const std::string& test_category, const std::string& test_case)
         {
+            auto evaluation = (actual == static_cast<T>(expected));
+
             Console::console_output_with_colour(ConsoleColour::FG_YELLOW, "RUNNING: Category = " + test_category + " , Test case = " + test_case + '\n');
 
-            auto evaluation = (actual == static_cast<T>(expected));
             std::stringstream stream_actual;
             stream_actual << actual;
             std::stringstream stream_expected;
             stream_expected << expected;
-            m_results.push_back({ test_category, test_case, stream_actual.str(), stream_expected.str(), evaluation});
+            m_results.push_back({ test_category, test_case, stream_actual.str(), stream_expected.str(), evaluation });
 
             std::stringstream test_case_display;
             test_case_display << "actual=" << actual << " expected=" << expected;
@@ -339,5 +349,58 @@ class UnitTest
     private:
         std::vector<UnitTestResult> m_results ={};
 };
+
+template <>
+bool UnitTest::test_equals(const char* actual, const char* expected, const std::string& test_category, const std::string& test_case)
+{
+    bool evaluation = false;
+    
+    if (actual && expected)
+    {
+        evaluation = strcmp(actual, expected) == 0;
+    }
+
+    std::stringstream stream_actual;
+
+    if (actual)
+    {
+        stream_actual << actual;
+    }
+
+    std::stringstream stream_expected;
+
+    if (expected)
+    {
+        stream_expected << expected;
+    }
+
+    m_results.push_back({ test_category, test_case, stream_actual.str(), stream_expected.str(), evaluation });
+
+    std::stringstream test_case_display;
+    test_case_display << "actual=";
+
+    if (actual)
+    {
+        test_case_display << " " << actual;
+    }
+
+    test_case_display << " expected=";
+
+    if (expected)
+    {
+        test_case_display << " " << expected;
+    }
+
+    if (evaluation)
+    {
+        Console::console_output_with_colour(ConsoleColour::FG_GREEN, "SUCCESS : " + test_case_display.str() + '\n');
+    }
+    else
+    {
+        Console::console_output_with_colour(ConsoleColour::FG_RED, "FAILURE : " + test_case_display.str() + '\n');
+    }
+
+    return evaluation;
+}
 
 #endif

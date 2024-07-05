@@ -20,7 +20,7 @@
 using namespace std;
 
 bool is_hyper_threading();
-void sleep(unsigned long microseconds);
+void sleep_in_microseconds(unsigned long microseconds);
 unsigned int get_number_of_logical_cores();
 unsigned int get_number_of_physical_cores();
 int pin_calling_thread_to_cpu_core(int core_id);
@@ -107,7 +107,7 @@ const std::string get_system_jitter_report(unsigned long duration_microseconds)
         threads.emplace_back(std::thread(jitter_measurement_function, i));
     }
 
-    sleep(duration_microseconds);
+    sleep_in_microseconds(duration_microseconds);
     is_ending.store(true);
 
     for (auto& measurement_thread : threads)
@@ -142,16 +142,24 @@ const std::string get_system_jitter_report(unsigned long duration_microseconds)
     return report.str();
 }
 
-void sleep(unsigned long microseconds)
+void sleep_in_microseconds(unsigned long microseconds)
 {
     #ifdef __linux__
     usleep(microseconds);
     #elif _WIN32
-    // In Windows , you can sleep in terms of milliseconds...
-    auto iterations = microseconds / 1000;
-    for (unsigned long i{ 0 }; i < iterations; i++)
+    // In Windows , the sleep granularity is 1 millisecond , therefore min wait will be 1000 microsecs
+    if (microseconds < 1000)
     {
         Sleep(1);
+        return;
+    }
+    else
+    {
+        auto iterations = microseconds / 1000;
+        for (unsigned long i{ 0 }; i < iterations; i++)
+        {
+            Sleep(1);
+        }
     }
     #endif
 }

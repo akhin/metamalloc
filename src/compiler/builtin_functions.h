@@ -83,4 +83,31 @@ inline int builtin_clzl(unsigned long value)
 #define builtin_aligned_free(ptr)                 _aligned_free(ptr)
 #endif
 
+//////////////////////////////////////////////////////////////////////
+// builtin_byte_swap16
+#if defined(__GNUC__)
+#define builtin_byte_swap16(val)     __builtin_bswap16(val)
+#elif defined(_MSC_VER)
+#include <cstdlib>
+#define builtin_byte_swap16(val)     _byteswap_ushort (val)
+#endif
+
+//////////////////////////////////////////////////////////////////////
+// builtin_byte_swap32
+#if defined(__GNUC__)
+#define builtin_byte_swap32(val)     __builtin_bswap32(val)
+#elif defined(_MSC_VER)
+#include <cstdlib>
+#define builtin_byte_swap32(val)     _byteswap_ulong  (val)
+#endif
+
+//////////////////////////////////////////////////////////////////////
+// builtin_byte_swap64
+#if defined(__GNUC__)
+#define builtin_byte_swap64(val)     __builtin_bswap64(val)
+#elif defined(_MSC_VER)
+#include <cstdlib>
+#define builtin_byte_swap64(val)     _byteswap_uint64  (val)
+#endif
+
 #endif

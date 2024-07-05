@@ -38,12 +38,12 @@ debug_with_ubsan: LFLAGS += -Wall -Wl,-z,defs -fsanitize=undefined -unresolved-s
 debug_with_ubsan: all
 
 #Release mode
-release: CFLAGS +=  -O3 -fopt-info-missed=missed.all -fno-rtti -fno-exceptions
+release: CFLAGS += -DNDEBUG -O3 -fopt-info-missed=missed.all -fno-rtti -fno-exceptions
 release: all
 all: $(OBJECTS) $(EXECUTABLE)
 
 $(EXECUTABLE) : $(OBJECTS)
-		$(CXX) $(LFLAGS) $(OBJECTS) -o $@ 
+		$(CXX) $(OBJECTS) $(LFLAGS) -o $@ 
 	
 .cpp.o: *.h
 	$(CXX) $(CFLAGS) $< -o $@

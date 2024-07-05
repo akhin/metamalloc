@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <csignal>
 #elif _WIN32
 #pragma comment(lib,"Ws2_32.lib")
 // Include order matters in Windows    // VOLTRON_EXCLUDE
@@ -26,10 +27,20 @@
 #include <cstring>
 #include <cstddef>
 
+#include "../compiler/builtin_functions.h"
+#include "../compiler/unused.h"
+
 enum class SocketType
 {
     TCP,
     UDP
+};
+
+enum class SocketOptionLevel
+{
+    SOCKET,
+    TCP,
+    IP
 };
 
 enum class SocketOption
@@ -46,8 +57,10 @@ enum class SocketOption
     TCP_ENABLE_CORK,
     TCP_ENABLE_QUICKACK,        // Applies only to Linux , even Nagle is turned off , delayed can cause time loss due in case of lost packages
     TCP_DISABLE_NAGLE,          // Send packets as soon as possible , no need to wait for ACKs or to reach a certain amount of buffer size
-    POLLING_INTERVAL,           // SO_BUSY_POLL , specifies time to wait for select to query kernel to know if new data received
-    SOCKET_PRIORITY
+    POLLING_INTERVAL,           // SO_BUSY_POLL , specifies time to wait for async io to query kernel to know if new data received
+    SOCKET_PRIORITY,
+    TIME_TO_LIVE,
+    ZERO_COPY,                  // https://www.kernel.org/doc/html/v4.15/networking/msg_zerocopy.html
 };
 
 enum class SocketState
@@ -69,8 +82,8 @@ class SocketAddress
             m_address = address;
 
             auto addr = &m_socket_address_struct;
-
-            memset(addr, 0, sizeof(sockaddr_in));
+            
+            builtin_memset(addr, 0, sizeof(sockaddr_in));
             addr->sin_family = PF_INET;
             addr->sin_port = htons(port);
 
@@ -89,7 +102,7 @@ class SocketAddress
 
         void initialise(struct sockaddr_in* socket_address_struct)
         {
-            char ip[50];
+            char ip[64];
             #ifdef __linux__
             inet_ntop(PF_INET, (struct in_addr*)&(socket_address_struct->sin_addr.s_addr), ip, sizeof(ip) - 1);
             #elif _WIN32
@@ -119,7 +132,7 @@ class SocketAddress
         std::string m_address;
         struct sockaddr_in m_socket_address_struct;
 
-        static int get_address_info(const char* hostname, struct in_addr* socketAddress)
+        static int get_address_info(const char* hostname, struct in_addr* socket_address)
         {
             struct addrinfo *res{ nullptr };
 
@@ -127,7 +140,7 @@ class SocketAddress
 
             if (result == 0)
             {
-                memcpy(socketAddress, &((struct sockaddr_in *) res->ai_addr)->sin_addr, sizeof(struct in_addr));
+                builtin_memcpy(socket_address, &((struct sockaddr_in *) res->ai_addr)->sin_addr, sizeof(struct in_addr));
                 freeaddrinfo(res);
             }
 
@@ -176,7 +189,7 @@ class Socket
             }
             else if constexpr (socket_type == SocketType::UDP)
             {
-                m_socket_descriptor = static_cast<int>(socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP));
+                m_socket_descriptor = static_cast<int>(socket(PF_INET, SOCK_DGRAM, 0));
             }
 
             if (m_socket_descriptor < 0)
@@ -202,11 +215,29 @@ class Socket
                 m_state = SocketState::DISCONNECTED;
             }
         }
+        
+        /*
+            BY DEFAULT , LINUX APPS GET SIGPIPE SIGNALS WHEN THEY WRTE TO WRITE/SEND 
+            ON CLOSED SOCKETS WHICH MAKES IT IMPOSSIBLE TO DETECT CONNECTION LOSS DURING SENDS. 
+            BY IGNORING THE SIGNAL , CONNECTION LOSS DETECTION CAN BE DONE INSIDE THE CALLER APP
+            
+            NOTE THAT CALL TO THIS ONE WILL AFFECT ENTIRE APPLICATION
+        */
+        void ignore_sigpipe_signals()
+        {
+            #ifdef __linux__
+            signal(SIGPIPE, SIG_IGN);
+            #endif
+        }
 
+        // For acceptors :  it is listening address and port
+        // For connectors : it is the NIC that the application wants to use for outgoing connection. 
+        //                  in connector case port can be specified as 0
         bool bind(const std::string_view& address, int port)
         {
-            m_address.initialise(address, port);
-            int result = ::bind(m_socket_descriptor, (struct sockaddr*)m_address.get_socket_address_struct(), sizeof(struct sockaddr_in));
+            m_bind_address.initialise(address, port);
+
+            int result = ::bind(m_socket_descriptor, (struct sockaddr*)m_bind_address.get_socket_address_struct(), sizeof(struct sockaddr_in));
 
             if (result != 0)
             {
@@ -217,12 +248,52 @@ class Socket
 
             return true;
         }
+        
+        // UDP functionality
+        bool join_multicast_group(const std::string_view& multicast_address)
+        {
+            struct ip_mreq mreq;
+            mreq.imr_multiaddr.s_addr = inet_addr(multicast_address.data());
+            mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+            
+            #ifdef __linux__
+            if (setsockopt(m_socket_descriptor, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
+            #elif _WIN32
+            if (setsockopt(m_socket_descriptor, IPPROTO_IP, IP_ADD_MEMBERSHIP, reinterpret_cast<const char*>(&mreq), sizeof(mreq)) < 0)
+            #endif
+            {
+                return false;
+            }
+            
+            return true;
+        }
+
+        // UDP functionality
+        bool leave_multicast_group(const std::string_view& multicast_address)
+        {
+            struct ip_mreq mreq;
+            mreq.imr_multiaddr.s_addr = inet_addr(multicast_address.data());
+            mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+            #ifdef __linux__
+            if (setsockopt(m_socket_descriptor, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
+            #elif _WIN32
+            if (setsockopt(m_socket_descriptor, IPPROTO_IP, IP_DROP_MEMBERSHIP, reinterpret_cast<const char*>(&mreq), sizeof(mreq)) < 0)
+            #endif
+            {
+                return false;
+            }
+
+            return true;
+        }
 
         bool connect(const std::string_view& address, int port)
         {
-            m_address.initialise(address, port);
+            set_endpoint(address, port);
 
-            if (::connect(m_socket_descriptor, (struct sockaddr*)m_address.get_socket_address_struct(), sizeof(struct sockaddr_in)) != 0)
+            auto ret = ::connect(m_socket_descriptor, (struct sockaddr*)m_endpoint_address.get_socket_address_struct(), sizeof(struct sockaddr_in));
+
+            if (ret  != 0)
             {
                 return false;
             }
@@ -231,31 +302,7 @@ class Socket
             return true;
         }
 
-        bool connect(const std::string_view& address, int port, int timeout)
-        {
-            auto blocking_mode_before_the_call = is_in_blocking_mode();
-            set_blocking_mode(false);
-
-            bool success{ false };
-
-            success = connect(address, port);
-
-            if (success == false)
-            {
-                success = select(true, true, timeout);
-            }
-
-            set_blocking_mode(blocking_mode_before_the_call);
-
-            if (success == false)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        Socket* accept(int timeout)
+        Socket* accept(int timeout_seconds)
         {
             if (m_state != SocketState::LISTENING && m_state != SocketState::ACCEPTED)
             {
@@ -266,13 +313,23 @@ class Socket
             set_blocking_mode(false);
 
             bool success{ true };
+            ///////////////////////////////////////////////////
+            fd_set read_set;
+            FD_ZERO(&read_set);
+            FD_SET(m_socket_descriptor, &read_set);
+                
+            struct timeval tv;
+            tv.tv_sec = timeout_seconds;
+            tv.tv_usec = 0;
+
+            success = (::select(m_socket_descriptor + 1, &read_set, nullptr, nullptr, &tv) <= 0) ? false : true;
+            ///////////////////////////////////////////////////
             int connector_socket_desc{ -1 };
+            
             struct sockaddr_in address;
             socklen_t len = sizeof(address);
-
-            memset(&address, 0, sizeof(address));
-            success = select(true, false, timeout);
-
+            builtin_memset(&address, 0, sizeof(address));
+            
             if (success)
             {
                 connector_socket_desc = static_cast<int>( ::accept(m_socket_descriptor, (struct sockaddr*)&address, &len) );
@@ -334,31 +391,53 @@ class Socket
             m_in_blocking_mode = blocking_mode;
         }
 
-        void set_socket_option(SocketOption option, int value)
+        bool set_socket_option(SocketOptionLevel level, SocketOption option, int value)
+        {
+            int actual_option = get_socket_option_value(option);
+
+            if (actual_option == -1)
+            {
+                // Even though called ,not supported on this system, for ex QUICK_ACK for Windows
+                return false;
+            }
+
+            int actual_level = get_socket_option_level_value(level);
+
+            if (actual_level == -1)
+            {
+                return false;
+            }
+
+            int actual_value = value;
+            int ret = -1;
+            #if __linux
+            ret = setsockopt(m_socket_descriptor, actual_level, actual_option, &actual_value, sizeof(actual_value));
+            #elif _WIN32
+            ret = setsockopt(m_socket_descriptor, actual_level, actual_option, (char*)&actual_value, sizeof(actual_value));
+            #endif
+
+            return (ret == 0) ? true : false;
+        }
+
+        bool set_socket_option(SocketOptionLevel level, SocketOption option, const char* buffer, std::size_t buffer_len)
         {
             int actual_option = get_socket_option_value(option);
 
             if (!actual_option)
             {
                 // Even though called ,not supported on this system, for ex QUICK_ACK for Windows
-                return;
+                return false;
             }
 
-            int actual_value = value;
-            #if __linux
-            setsockopt(m_socket_descriptor, SOL_SOCKET, actual_option, &actual_value, sizeof actual_value);
-            #elif _WIN32
-            setsockopt(m_socket_descriptor, SOL_SOCKET, actual_option, (char*)&actual_value, sizeof actual_value);
-            #endif
-        }
+            int actual_level = get_socket_option_level_value(level);
 
-        void set_ttl(int ttl)
-        {
-            #if __linux
-            setsockopt(m_socket_descriptor, IPPROTO_IP, IP_TTL, reinterpret_cast<void*>(&ttl), sizeof(ttl));
-            #elif _WIN32
-            setsockopt(m_socket_descriptor, IPPROTO_IP, IP_TTL, (const char*)&ttl, sizeof(ttl));
-            #endif
+            if (actual_level == -1)
+            {
+                return false;
+            }
+
+            int ret = setsockopt(m_socket_descriptor, actual_level, actual_option, buffer, sizeof buffer_len);
+            return (ret == 0) ? true : false;
         }
 
         bool listen()
@@ -374,24 +453,28 @@ class Socket
             return true;
         }
 
-        int get_socket_option(SocketOption option)
+        int get_socket_option(SocketOptionLevel level, SocketOption option)
         {
+            int actual_level = get_socket_option_level_value(level);
             int actual_option = get_socket_option_value(option);
+
             int ret{ 0 };
-            socklen_t len{ 0 };
+            socklen_t len = sizeof(ret);
 
             #ifdef __linux__
-            getsockopt(m_socket_descriptor, SOL_SOCKET, actual_option, (void*)(&ret), &len);
+            getsockopt(m_socket_descriptor, actual_level, actual_option, (void*)(&ret), &len);
             #elif _WIN32
-            getsockopt(m_socket_descriptor, SOL_SOCKET, actual_option, (char*)(&ret), &len);
+            getsockopt(m_socket_descriptor, actual_level, actual_option, (char*)(&ret), &len);
             #endif
 
             return ret;
         }
 
-        int get_last_socket_error()
+        void get_socket_option(SocketOptionLevel level, SocketOption option, char* buffer, std::size_t buffer_len)
         {
-            return get_socket_option(SocketOption::GET_ERROR_AND_CLEAR);
+            int actual_level = get_socket_option_level_value(level);
+            int actual_option = get_socket_option_value(option);
+            getsockopt(m_socket_descriptor, actual_level, actual_option, buffer, buffer_len);
         }
 
         static int get_current_thread_last_socket_error()
@@ -433,46 +516,9 @@ class Socket
             return ret;
         }
 
-        bool is_connection_lost(int error_code, std::size_t receive_result, bool is_caller_async)
-        {
-            bool ret{ false };
-            #ifdef __linux__
-            if (error_code >= 100 && error_code <= 104)
-            {
-                ret = true;
-            }
-            #elif _WIN32
-            if (error_code == WSAECONNRESET || error_code == WSAECONNABORTED)
-            {
-                ret = true;
-            }
-            #endif
-            else if(is_caller_async && !receive_result)
-            {
-                // In case the caller is doing async io with select/poll/epoll/ioring/iouring
-                ret = true;
-            }
-
-            if (ret == true)
-            {
-                m_state = SocketState::DISCONNECTED;
-            }
-            return ret;
-        }
-
         SocketState get_state() const
         {
             return m_state;
-        }
-
-        int get_port() const
-        {
-            return m_address.get_port();
-        }
-
-        std::string get_address() const
-        {
-            return m_address.get_address();
         }
 
         int get_socket_descriptor() const
@@ -480,77 +526,152 @@ class Socket
             return m_socket_descriptor;
         }
 
-        int receive(char* buffer, std::size_t len, int timeout = 0)
+        int receive(char* buffer, std::size_t len)
         {
-            if (timeout > 0)
-            {
-                if (select(true, false, timeout) == false)
-                {
-                    return 0;
-                }
-            }
-
-            auto result = ::recv(m_socket_descriptor, buffer, static_cast<int>(len), static_cast<int>(0));
-
-            return result;
+            return ::recv(m_socket_descriptor, buffer, static_cast<int>(len), static_cast<int>(0));
+        }
+        
+        // UDP functionality
+        int receive_from(char* buffer, std::size_t len)
+        {
+            return ::recvfrom(m_socket_descriptor, buffer, static_cast<int>(len), 0, nullptr, nullptr);
         }
 
-        int send(const std::string_view& buffer, int timeout = 0)
+        int send(const char* buffer, std::size_t len)
         {
-            return send(buffer.data(), buffer.length(), timeout);
+            return ::send(m_socket_descriptor, buffer, static_cast<int>(len), static_cast<int>(0)) ;
         }
 
-        int send(const char* buffer, std::size_t len, int timeout = 0)
+        int send_zero_copy(const char* buffer, std::size_t len)
         {
-            if (timeout > 0)
-            {
-                if (select(false, true, timeout) == false)
-                {
-                    return 0;
-                }
-            }
+            #ifdef MSG_ZEROCOPY
+            return ::send(m_socket_descriptor, buffer, static_cast<int>(len), MSG_ZEROCOPY);
+            #else
+            return ::send(m_socket_descriptor, buffer, static_cast<int>(len), static_cast<int>(0));
+            #endif
+        }
+        
+        // UDP functionality
+        int send_to(const char* buffer, std::size_t len)
+        {
+            return ::sendto(m_socket_descriptor, buffer, static_cast<int>(len), 0, (struct sockaddr*)m_endpoint_address.get_socket_address_struct(), sizeof(struct sockaddr_in)) ;
+        }
 
-            auto result = ::send(m_socket_descriptor, buffer, static_cast<int>(len), static_cast<int>(0)) ;
-
-            return result;
+        void set_endpoint(const std::string_view& address , int port)
+        {
+            m_endpoint_address.initialise(address, port);
         }
 
         bool is_in_blocking_mode() const { return m_in_blocking_mode; }
 
-protected:
-        // Needed for operations that need timeout
-        bool select(bool read, bool write, long timeout)
+        /*
+            Note for non-blocking/asycn-io sockets : recv will result with return code 0
+            therefore you also need to check recv result
+        */
+        bool is_connection_lost_during_receive(int error_code)
         {
-            fd_set write_set;
-            fd_set read_set;
-            fd_set* read_set_ptr{ nullptr };
-            fd_set* write_set_ptr{ nullptr };
+            bool ret{ false };
 
-            if (write)
+            #ifdef __linux__
+            switch (error_code)
             {
-                FD_ZERO(&write_set);
-                FD_SET(m_socket_descriptor, &write_set);
-                write_set_ptr = &write_set;
+                case ECONNRESET:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case ECONNREFUSED:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case ENOTCONN:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                default:
+                    break;
             }
-
-            if (read)
+            #elif _WIN32
+            switch (error_code)
             {
-                FD_ZERO(&read_set);
-                FD_SET(m_socket_descriptor, &read_set);
-                read_set_ptr = &read_set;
+                case WSAENOTCONN:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case WSAENETRESET:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case WSAESHUTDOWN:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case WSAECONNABORTED:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case WSAECONNRESET:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                default:
+                    break;
             }
+            #endif
 
-            struct timeval tv;
-            tv.tv_sec = timeout;
-            tv.tv_usec = 0;
+            return ret;
+        }
 
-            // First arg ignored in Windows
-            if (::select(m_socket_descriptor + 1, read_set_ptr, write_set_ptr, nullptr, &tv) <= 0)
+        bool is_connection_lost_during_send(int error_code)
+        {
+            bool ret{ false };
+
+            #ifdef __linux__
+            switch (error_code)
             {
-                return false;
+                case ECONNRESET:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case ENOTCONN:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case EPIPE:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                default:
+                    break;
             }
+            #elif _WIN32
+            switch (error_code)
+            {
+                case WSAENOTCONN:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case WSAENETRESET:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case WSAESHUTDOWN:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case WSAECONNABORTED:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                case WSAECONNRESET:
+                    ret = true;
+                    m_state = SocketState::DISCONNECTED;
+                    break;
+                default:
+                    break;
+            }
+            #endif
 
-            return true;
+            return ret;
         }
 
 private:
@@ -558,7 +679,9 @@ private:
     SocketState m_state;
     bool m_in_blocking_mode = true;
     int m_pending_connections_queue_size;
-    SocketAddress m_address;
+
+    SocketAddress m_bind_address;        // TCP Acceptors -> listening address  , TCP Connectors -> NIC address , UDP Multicast listeners -> NIC address
+    SocketAddress m_endpoint_address;    // Used by only TCP connectors & UDP multicast publishers
 
     // Move ctor deletion
     Socket(Socket&& other) = delete;
@@ -568,12 +691,34 @@ private:
     void initialise(int socket_descriptor, struct sockaddr_in* socket_address)
     {
         m_socket_descriptor = socket_descriptor;
-        m_address.initialise(socket_address);
+        m_endpoint_address.initialise(socket_address);
+    }
+
+    int get_socket_option_level_value(SocketOptionLevel level)
+    {
+        int ret{ -1 };
+
+        switch (level)
+        {
+            case SocketOptionLevel::SOCKET:
+                ret = SOL_SOCKET;
+                break;
+            case SocketOptionLevel::TCP:
+                ret = IPPROTO_TCP;
+                break;
+            case SocketOptionLevel::IP:
+                ret = IPPROTO_IP;
+                break;
+            default:
+                break;
+        }
+
+        return ret;
     }
 
     int get_socket_option_value(SocketOption option)
     {
-        int ret{ 0 };
+        int ret{ -1 };
 
         switch (option)
         {
@@ -627,6 +772,16 @@ private:
             case SocketOption::POLLING_INTERVAL:
                 #ifdef SO_BUSY_POLL
                 ret = SO_BUSY_POLL;
+                #endif
+                break;
+            case SocketOption::TIME_TO_LIVE:
+                #ifdef IP_TTL
+                ret = IP_TTL;
+                #endif
+                break;
+            case SocketOption::ZERO_COPY:
+                #ifdef SO_ZEROCOPY
+                ret = SO_ZEROCOPY;
                 #endif
                 break;
             default:

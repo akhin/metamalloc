@@ -3,7 +3,6 @@
 
 #include <cassert>
 #include <cstddef>
-#include "../compiler/builtin_functions.h"
 #include "pow2_utilities.h"
 
 class ModuloUtilities
@@ -15,12 +14,11 @@ class ModuloUtilities
             assert(Pow2Utilities::is_power_of_two(second));
             return first & (second - 1);
         }
-
-        static std::size_t modulo(std::size_t first, std::size_t second)
+        
+        static std::size_t modulo(std::size_t first, std::size_t second) 
         {
-            std::size_t shift = builtin_ctzl(static_cast<unsigned long>(second));
-            std::size_t remainder = first - ((first >> shift) << shift);
-            return remainder;
+            assert(second>0);
+            return first - (first / second) * second;
         }
 };
 

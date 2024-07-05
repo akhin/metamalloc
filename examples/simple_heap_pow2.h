@@ -122,7 +122,6 @@ class SimpleHeapPow2 : public HeapBase<SimpleHeapPow2<concurrency_policy, ArenaT
 
                 buffer_index += bin_buffer_size;
                 size_class = size_class << 1;
-
             }
             // PROVIDE BUFFER FOR THE BIG OBJECT BIN
             SegmentCreationParameters big_segment_params;
@@ -162,7 +161,7 @@ class SimpleHeapPow2 : public HeapBase<SimpleHeapPow2<concurrency_policy, ArenaT
         ALIGN_CODE(AlignmentConstants::CACHE_LINE_SIZE)
         void deallocate(void* ptr)
         {
-            // For local ( bounded ) heaps, owns_pointer is contant time
+            // For local ( bounded ) heaps, owns_pointer is constant time
             // For central heaps, it is a linear search
             // However as long as num of big object logical pages are at a reasonable level , performance will be fine.
             if (m_big_object_bin.owns_pointer(ptr) == false)

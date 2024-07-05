@@ -20,7 +20,7 @@ REM Set the console color to yellow
 color 0E
 
 REM Build the C++ file using MSVC, no O3 in MSVC
-cl.exe /EHsc /permissive- /std:c++17 /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
+cl.exe /EHsc /permissive- /std:c++17 /D NDEBUG /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATION_UNIT_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
 
 
 REM Delete the object file generated during compilation

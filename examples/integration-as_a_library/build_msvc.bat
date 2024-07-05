@@ -21,7 +21,7 @@ color 0E
 
 set "EXECUTABLE_TU_NAME=sample_app"
 del %EXECUTABLE_TU_NAME%.exe
-cl.exe /EHsc /I"../../" /I"../../examples" /std:c++17 /O2 %EXECUTABLE_TU_NAME%.cpp /Fe:%EXECUTABLE_TU_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
+cl.exe /EHsc /I"../../" /I"../../examples" /std:c++17 /D NDEBUG /O2 %EXECUTABLE_TU_NAME%.cpp /Fe:%EXECUTABLE_TU_NAME%.exe /link /subsystem:console /DEFAULTLIB:Advapi32.lib
 
 del %EXECUTABLE_TU_NAME%.obj
 del vc140.pdb

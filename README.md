@@ -1,6 +1,6 @@
 ## <a name="intro"></a>**metamalloc**  
 
-metamalloc.h is a single-header template based general purpose memory allocator library that allows you to easily build an allocator that is tailored for your software.
+metamalloc.h is a single-header template based general purpose memory allocation library that allows you to build an allocator that is tailored for your software.
 
 In order to build a thread caching global allocator, the only thing you need to do is provide a heap class in which you specify size classes and their capacities for your software. ( An example is provided and explained in the 'Usage & framework' section.) :
 
@@ -26,7 +26,7 @@ The repo also provides another no-dependencies single-header : memlive.h. You ca
 
 - Integrations: You can include the header and call its allocation methods. Also examples for building a LD_PRELOADable shared object on Linux and statically linked DLL that intercepts system functions on Windows are provided. See the integration section below for details.
 
-- Building examples/tests/benchmarks : Each buildable has 1 Makefile (make debug & make release) for Linux/GCC and 1 bat file for MSVC2022/Windows. ( For other MSVC versions, you can edit the bat file. )
+- Building examples/tests/benchmarks : Each buildable has one Makefile (make debug & make release) for Linux/GCC and one bat file for MSVC2022/Windows. ( For other MSVC versions, you can edit the bat file. )
 
 * [Benchmarks](#benchmarks)
 * [Usage & framework](#usage_and_framework)
@@ -46,17 +46,17 @@ The repo also provides another no-dependencies single-header : memlive.h. You ca
 
 Benchmarks use "SimpleHeapPow2" in metamalloc side which is the example heap for metamalloc. It is described in the next section.
 
-Global allocator benchmarks are done via LD_PRELOAD'ed shared objects on Linux and statically linked DLLs on Windows.
+Global allocator benchmarks are done via LD_PRELOAD'ed shared objects on Linux and via statically linked DLLs on Windows.
 You can find prebuilt zipped binaries in the "benchmarks" directory and SO/DLL sources in the examples directory. The Linux shared objects require GNU LIB C 2.35 runtime as they are built on Ubuntu22.4 . If you are using a different one, the zip file also contains a text file with steps to build tcmalloc,IntelOneTBB and metamalloc shared objects.
 
-All benchmarks use RDTSCP timestamp and CPU frequencies were maximised. They also access every single allocated byte for both writing and reading , as that is as important as allocation latency from point of a client application.
+All benchmarks use RDTSCP timestamp and CPU frequencies were maximised. They also access every single allocated byte for both write and read operations , as that is as important as allocation latency from point of a client application.
 
 The systems used for benchmarks : 
-- Linux system : Ubuntu 22.4 ,  Intel Core i7 4700HQ - 4 cores, max freq :3.4 ghz
+- Linux system : Ubuntu 22.4 ,  Intel Core i7 4700HQ - 4 cores, max freq: 3.4 ghz
 - Windows system : Windows11, AMD Ryzen 7 5700U - 8cores , max freq: 4.3ghz
 
 
-**Cache locality benchmark :** In this Linux benchmark , we allocate memory for members of an array of 1 million objects and then invoke '_mm_clflush' on the array. And then we access them for reads and writes. Benchmark measures LLC cache misses and duration only in the part that the array is being accessed :
+**Cache locality benchmark :** In this Linux benchmark , we allocate memory for members of an array of 1 million objects and then invoke '_mm_clflush' on the array. And then we access them for reads and writes. Benchmark measures LLC cache misses and duration only for the part that it accesses the array :
 
 | Allocator               | Version / Variant               | Cache misses (LLC both read & write) | Duration |
 |-------------------------|:-----------------------------------:|:-----------------------:|:--------------:|
@@ -123,7 +123,7 @@ using AllocatorType = ScalableAllocator<CentralHeapType, LocalHeapType>;
 ```
 
 As for thread caching, that is standard model nowadays as it is scalable and has minimised lock contention ( explained more in detail in multithreading section ). 
-You will have heaps per thread by using thread local storage mechanism. They will always have 1 client thread for allocations. If thread local heaps exhaust, then allocations will failover to the central heap.
+You will have heaps per thread via thread local storage mechanism. If thread local heaps exhaust, then allocations will failover to the central heap.
 
 Check "thread caching global allocator" example in the examples directory to debug the above one. Note that you can also specialise ScalableAllocator template methods to inject thread specific behaviour. For that one, see the multithreading section.
 
@@ -141,7 +141,7 @@ You can see the pseudocode of how it works below :
 ```plaintext
 
 // A logical page is a basically a freelist. 
-// A segment is a doubly linked list of logical pages.
+// A segment is a doubly linked list of logical pages/freelists.
 // This example heap is made of 8 segments for small object size classes and 1 segment for anything larger 
 Segment small_objects_bins[8] // 8 = 16 32 64 128 256 512 1024 2048
 Segment big_object
@@ -179,7 +179,7 @@ Here is an overview of the building blocks :
 
 ## <a name="integration"></a>Integration
 
-The easiest way to integrate is including the library and your heap class and building your application with them. You can find "integration - as a library" example in the examples directory. Note that this method won't intercept the memory allocation functions except operator new/delete in shared objects/DLLs loaded by your process. However it is reasonable for C++ applications. For example, I am able to use metamalloc and simple_heap_pow2 in QT applications by overloading operator new and delete variants on Linux and Windows with no issues as QT framework uses mostly new/delete.
+The easiest way to integrate is including the library and your heap class and building your application with them. You can find "integration - as a library" example in the examples directory. Note that this method won't intercept the memory allocation functions except operator new/delete in shared objects/DLLs loaded by your process. However it is reasonable for C++ applications.
 
 There are also "integration - linux so ld_preload" and "integration - windows statically linked dll" examples in the examples directory. Unlike previous method, you will be able to intercept and handle memory functions in other shared objects/DLLs loaded by your process :
 
@@ -190,16 +190,16 @@ Note that the examples only cover only the most fundamental memory allocation fu
 		
 ## <a name="multithreading"></a>Multithreading
 
-There are 3 concurrency policies that applies to heaps and segments. Mentioned locks below are CAS operations :
+There are 3 concurrency policies that applies to heaps and segments. The mentioned locks below are CAS operations :
 
-- Thread-local policy : Deallocations targeting a thread local heap will submit pointers to a thread safe queue and quit immediately. Allocations on thread local heaps will do deallocations by checking the queue and return a pointer from there if possible. Deferred allocations help us here to minimise the contention as deallocations can come from different threads but allocations will always come from one thread.
+- Thread-local policy : Deallocations targeting a thread local heap will submit pointers to a thread safe queue and quit immediately. Allocations on thread local heaps will deallocate by checking the queue and returning a pointer from there if possible. Deferred allocations help us here to minimise the contention as deallocations can come from different threads, but allocations will always come from one thread.
 - Central policy : There will be segment level locking.
 - Single thread policy : No locks at all.
 
 As for Arena class, it is locked by default to protect its cache. However in case of single threaded use, you can disable its locking by specialising with 'LockPolicy::NO_LOCK'. 
 
 Injecting thread specific behaviour : A common issue with thread caching allocators is that , they all use unique size classes. If a specific thread is allocating only few size classes, the unused ones are actually wasted.
-At this point, you can add thread-specific behaviour in your application's source as below :
+In this case, you can add thread-specific behaviour in your application's source as below :
 
 ```cpp
 ...
@@ -229,7 +229,7 @@ Thread exit handling : Another common problem in thread caching allocators is ex
  
 ## <a name="huge_page"></a>Huge page usage
 
-You can utilise huge pages in Arena template class specialisation. An example for a local allocator is provided in examples directory. You can also see local allocator benchmark to observe the difference between with and without huge pages.
+You can utilise huge pages in Arena template class specialisation. An example for a local allocator is provided in the examples directory. You can also see the local allocator benchmark to observe the difference with huge pages.
 
 On Linux if transparent huge pages are disabled, metamalloc will use the huge page flag during mmap call. If THP is enabled, then it will use madvise.
 
@@ -290,7 +290,7 @@ As for performance deallocation performance of your allocator, you should always
 
 - Double frees : There are no checks against it. Therefore your application may crash/segfault. You can use address sanitizer to get rid of double frees in your application before integrating metamalloc.
 
-- Invalid frees : That means trying to deallocate a pointer which was not allocated by metamalloc. Metamalloc deallocations will ignore pointers that were not allocated by the library.
+- Invalid frees : That means trying to deallocate a pointer which was not allocated by metamalloc. Your application may crash/segfault in this case.
 
 - Allocations returning nullptr : That may happen due to out of memory. Another reason may be that an allocation size exceeds the maximum allocation that your heap can handle. For example , in SimpleHeapPow2 , maximum allocation size is same as big object logical page size. If that is the case , then you will need to use a higher logical page size for your segments that handles the largest sizes. Not every path of every software check allocation failures therefore this may come as a crash or even worse an odd behaviour which doesn't lead to a crash.
 
@@ -327,7 +327,8 @@ After that you navigate to address:port_number in your browser. You can check "m
 
 ## <a name="version_history"></a>Version history
 
-The latest version is 1.0.0 which is also the initial version.
+- 1.0.1 : Refactorings
+- 1.0.0 : Initial version 
 
 ## <a name="contact"></a>Contact
 

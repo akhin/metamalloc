@@ -30,7 +30,7 @@ constexpr std::size_t THREAD_RANDOM_SLEEPS_IN_USECS = 100; // To simulate real e
 //////////////////////////////////////////////////
 void run_multithreaded_benchmark();
 bool validate_buffer(void* buffer, std::size_t buffer_size);
-void sleep_randomly(int max_duration_in_microsecs);
+void sleep_randomly_usecs(int max_duration_in_microsecs);
 
 #define ENABLE_ERROR_CHECKING
 
@@ -87,7 +87,7 @@ void run_multithreaded_benchmark()
                 if (!validate_buffer(ptr, allocation_size)) {  fprintf(stderr, "ALLOCATION FAILED !!!\n"); }
                 #endif
 
-                sleep_randomly(THREAD_RANDOM_SLEEPS_IN_USECS);
+                sleep_randomly_usecs(THREAD_RANDOM_SLEEPS_IN_USECS);
 
                 allocation_buckets[allocation_bucket_index][i].ptr = ptr;
                 allocation_buckets[allocation_bucket_index][i].allocated = true;
@@ -171,17 +171,25 @@ bool validate_buffer(void* buffer, std::size_t buffer_size)
     return true;
 }
 
-void sleep_randomly(int max_duration_in_microsecs )
+void sleep_randomly_usecs(int max_duration_in_microsecs )
 {
     unsigned long microseconds = static_cast<unsigned long>(RandomNumberGenerator::get_random_integer(max_duration_in_microsecs));
     #ifdef __linux__
     usleep(microseconds);
     #elif _WIN32
-    // In Windows , you can sleep in terms of milliseconds...
-    auto iterations = microseconds / 1000;
-    for (unsigned long i{ 0 }; i < iterations; i++)
+    // In Windows , the sleep granularity is 1 millisecond , therefore min wait will be 1000 microsecs
+    if (microseconds < 1000)
     {
         Sleep(1);
+        return;
+    }
+    else
+    {
+        auto iterations = microseconds / 1000;
+        for (unsigned long i{ 0 }; i < iterations; i++)
+        {
+            Sleep(1);
+        }
     }
     #endif
 }
