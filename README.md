@@ -10,7 +10,7 @@ In return , that would improve CPU cache locality, reduce memory consumption and
 
 You can see benchmark numbers against the monolithic allocators IntelOneTBB, Google's tcmalloc, GNU LIB C and Microsoft's UCRT in the benchmarks section.
 
-The only limitations for size classes you choose are that they have to be powers of two and the minimum size class can't be less than 16 bytes, so that the framework guarantees minimum 16 byte (SSE4.2) alignment for all kinds of allocations.
+Note that it can also be used to develop local allocators. You can find those in the examples directory.
 
 The repo also provides another no-dependencies single-header : memlive.h. You can use memlive as a live per-thread allocation profiler. After building your application with it, you can monitor allocations in your browser : 
 
@@ -24,19 +24,20 @@ The repo also provides another no-dependencies single-header : memlive.h. You ca
 
 - Single header. You can browse the organised source under "src". I use a py script that I call as voltron to generate the single header. Voltron.py is under tools directory. 
 
-- Integrations: You can include the header and call its allocation methods. Also examples for building a LD_PRELOADable shared object on Linux and statically linked DLL that intercepts system functions on Windows are provided. See the integration section below for details.
+- Integrations: You can include the header and call its allocation methods. Also examples for building a LD_PRELOADable shared object on Linux and statically linked DLL on Windows are provided. See the integration section below for details.
 
 - Building examples/tests/benchmarks : Each buildable has one Makefile (make debug & make release) for Linux/GCC and one bat file for MSVC2022/Windows. ( For other MSVC versions, you can edit the bat file. )
 
 * [Benchmarks](#benchmarks)
 * [Usage & framework](#usage_and_framework)
+* [Framework constraints](#framework_constraints)
 * [Integration](#integration)
 * [Multithreading](#multithreading)
-* [Huge page usage](#huge_page)
 * [Metadata](#metadata)
 * [Fragmentation](#fragmentation)
 * [Page recycling](#page_recycling)
 * [Deallocation lookups](#deallocation_lookups)
+* [Huge page usage](#huge_page)
 * [Error handling & leak checking](#error_handling_and_leak_checking)
 * [Memlive](#memlive)
 * [Version history](#version_history)
@@ -46,25 +47,14 @@ The repo also provides another no-dependencies single-header : memlive.h. You ca
 
 Benchmarks use "SimpleHeapPow2" in metamalloc side which is the example heap for metamalloc. It is described in the next section.
 
-Global allocator benchmarks are done via LD_PRELOAD'ed shared objects on Linux and via statically linked DLLs on Windows.
-You can find prebuilt zipped binaries in the "benchmarks" directory and SO/DLL sources in the examples directory. The Linux shared objects require GNU LIB C 2.35 runtime as they are built on Ubuntu22.4 . If you are using a different one, the zip file also contains a text file with steps to build tcmalloc,IntelOneTBB and metamalloc shared objects.
-
 All benchmarks use RDTSCP timestamp and CPU frequencies were maximised. They also access every single allocated byte for both write and read operations , as that is as important as allocation latency from point of a client application.
 
 The systems used for benchmarks : 
+
 - Linux system : Ubuntu 22.4 ,  Intel Core i7 4700HQ - 4 cores, max freq: 3.4 ghz
 - Windows system : Windows11, AMD Ryzen 7 5700U - 8cores , max freq: 4.3ghz
 
-
-**Cache locality benchmark :** In this Linux benchmark , we allocate memory for members of an array of 1 million objects and then invoke '_mm_clflush' on the array. And then we access them for reads and writes. Benchmark measures LLC cache misses and duration only for the part that it accesses the array :
-
-| Allocator               | Version / Variant               | Cache misses (LLC both read & write) | Duration |
-|-------------------------|:-----------------------------------:|:-----------------------:|:--------------:|
-| GNU LibC            |     2.35                                |    3.735.728                     |    15262 microseconds            |
-| metamalloc      | SimpleHeapPow2                                    |       2.358,243                  |  10810 microseconds              |
-
-
-**Single threaded local allocator benchmark :** In this Linux benchmark, as an additional setting, applied CPU isolation and pinned threads. ( Note that different pinnings may give different results. I tried this benchmark only on core0. ) We allocate and deallocate various sizes :
+**Single threaded local allocator benchmark :** In this Linux benchmark, applied CPU isolation and pinned threads. We allocate and deallocate various sizes :
 
 | Allocator               | Version / Variant               |Allocations per microsecond              | Deallocations per microsecond| Total duration |
 |-------------------------|:-----------------------------------:|:-----------------------:|:--------------:|:--------------:|
@@ -72,8 +62,19 @@ The systems used for benchmarks :
 | metamalloc      | SimpleHeapPow2 with regular 4KB vm pages                                    |           43              |      126          | 848 microseconds |
 | metamalloc |   SimpleHeapPow2 with 2MB huge pages                                  |      74                   |    128            | 677 microseconds|
 
+**Single threaded local allocator cache locality benchmark :** In this Linux benchmark , we allocate memory for members of an array of 1 million objects and then invoke '_mm_clflush' on the array. And then we access them for reads and writes. Benchmark measures LLC cache misses and duration only for the part that it accesses the array :
 
-**Multithreaded thread-caching global allocator benchmark :** The benchmarks are done against LD_PRELOADed executables on Linux. Each thread is making 407100 allocations and cross-thread deallocations. So in total each executable makes about 1.6 million allocations and cross-thread deallocations. They also do reads and writes on the allocated buffers :
+| Allocator               | Version / Variant               | Cache misses (LLC both read & write) | Duration |
+|-------------------------|:-----------------------------------:|:-----------------------:|:--------------:|
+| GNU LibC            |     2.35                                |    3.735.728                     |    15262 microseconds            |
+| metamalloc      | SimpleHeapPow2                                    |       2.358,243                  |  10810 microseconds              |
+
+**Multithreaded thread-caching global allocator benchmark :** Global allocator benchmarks are done via LD_PRELOAD'ed shared objects on Linux and via statically linked DLLs on Windows.
+You can find prebuilt zipped binaries in the "benchmarks" directory and SO/DLL sources in the examples directory. 
+
+( The Linux shared objects require GNU LIB C 2.35 runtime as they are built on Ubuntu22.4 . If you are using a different one, the zip file also contains a text file with steps to build tcmalloc,IntelOneTBB and metamalloc shared objects. )
+
+In this benchmark, each thread is making 407100 allocations and cross-thread deallocations. So in total each executable makes about 1.6 million allocations and cross-thread deallocations. They also do reads and writes on the allocated buffers :
 
 | Allocator               | Version / Variant               | P90 Duration for 4 threads |
 |-------------------------|:-----------------------------------:|:-----------------------:|
@@ -99,7 +100,6 @@ As for 8 core Windows system via DLLs and with 8 threads , each executable makes
 | tcmalloc            |  2.9.1-0ubuntu3                                  |  256 MB                      |                           
 | metamalloc     |      SimpleHeapPow2                               |                    95 MB     |      
 
-
 ## <a name="usage_and_framework"></a>Usage and framework
 
 You can find example heaps "minimal_heap.h" and "simple_heap_pow2.h" in the examples directory.
@@ -122,7 +122,7 @@ using AllocatorType = ScalableAllocator<CentralHeapType, LocalHeapType>;
 
 ```
 
-As for thread caching, that is standard model nowadays as it is scalable and has minimised lock contention ( explained more in detail in multithreading section ). 
+As for thread caching, that is the most common model as it is scalable and has minimised lock contention ( explained more in detail in multithreading section ). 
 You will have heaps per thread via thread local storage mechanism. If thread local heaps exhaust, then allocations will failover to the central heap.
 
 Check "thread caching global allocator" example in the examples directory to debug the above one. Note that you can also specialise ScalableAllocator template methods to inject thread specific behaviour. For that one, see the multithreading section.
@@ -152,7 +152,7 @@ allocation
         Allocate from adjusted size's size class bin
     Else 
         Allocate from the big object bin
-        
+
 deallocation
     If pointer does not belong to the big object segment 
         Find size class // The framework does that part by applying bitwise mask on the address, which is equivalent of modulo'ing logical page size
@@ -162,8 +162,6 @@ deallocation
 ```
 
 As the name suggests , SimpleHeapPow2 has minimal segregation. But you can create as many segregations as you need for your application.
-
-As for size class limitations, the only limitations for size classes you choose are that they have to be powers of two and the minimum size class can't be less than 16 bytes. You can actually use non-pow2 sizes and sizes less than 16 bytes. However considering SIMD instructions, the framework guarantees a minimum of 16 byte alignment for all kinds of allocations for only pow2 sizes which are >= 16 bytes.
 
 In case you want to use your heap for single threaded local allocations for critical parts of your software, you can do it by specialising with ConcurrencyPolicy::SINGLE_THREAD :
 
@@ -177,22 +175,32 @@ Here is an overview of the building blocks :
 
 ![BuildingBlocks](images/building_blocks.png)
 
+## <a name="framework_constraints"></a>Framework constraints
+
+1. Minimum allocation alignment guarantee : The framework does not guarantee 16 byte (SSE4.2) alignment for all kinds of allocations by default. In order to achieve it :
+
+- Your minimum size class should not be less than 16 bytes
+- You use only power of two size classes.
+
+2. Contigious memory in thread local heaps : Scalable allocator's deallocate method first tries to find out which heap the pointer belongs to. In the current search method, it assumes each thread local heap has contigious memory. 
+That way framework avoids allocating extra memory for tracking every allocated pointer.
+
 ## <a name="integration"></a>Integration
 
-The easiest way to integrate is including the library and your heap class and building your application with them. You can find "integration - as a library" example in the examples directory. Note that this method won't intercept the memory allocation functions except operator new/delete in shared objects/DLLs loaded by your process. However it is reasonable for C++ applications.
+The easiest way to integrate is including the library and your heap class and building your application with them. You can find "integration - as a library" example in the examples directory. Note that this method won't intercept the memory allocation functions except operator new/delete in shared objects/DLLs loaded by your process.
 
 There are also "integration - linux so ld_preload" and "integration - windows statically linked dll" examples in the examples directory. Unlike previous method, you will be able to intercept and handle memory functions in other shared objects/DLLs loaded by your process :
 
 - On the Linux side if you use a shared object, you won't need to rebuild or relink your application. You will only need to use LD_PRELOAD when starting your application. In tests, I was able to LD_PRELOAD Python, GDB and various bash utilities with metamalloc simpleheappow2 shared object on Ubuntu22.04.
 - On the Windows side, there is no equivalent of LD_PRELOAD. You will need to link your application against the DLL. The example DLL uses trampolines to replace CRT memory functions in runtime as LD_PRELOAD is absent. Also the Windows DLL example only intercepts UCRT (ucrtbase.dll). If you are targeting a different CRT version or multiple CRTs, you will need to modify the DLL code.
-	
+
 Note that the examples only cover only the most fundamental memory allocation functions (malloc, free, calloc, realloc, aligned_alloc, '_aligned_malloc', '_aligned_free', malloc_usable_size, '_msize') and all 20 variants of operator new/delete that exist in GNU LibC and MS UCRT binaries. Therefore if your application is using more, you may need to add missing redirections.
-		
+
 ## <a name="multithreading"></a>Multithreading
 
 There are 3 concurrency policies that applies to heaps and segments. The mentioned locks below are CAS operations :
 
-- Thread-local policy : Deallocations targeting a thread local heap will submit pointers to a thread safe queue and quit immediately. Allocations on thread local heaps will deallocate by checking the queue and returning a pointer from there if possible. Deferred allocations help us here to minimise the contention as deallocations can come from different threads, but allocations will always come from one thread.
+- Thread-local policy : Deallocations targeting a thread local heap will submit pointers to a thread safe queue and quit immediately. Allocations on thread local heaps will deallocate by checking the queue and returning a pointer from there if possible. Deferred deallocations help us here to minimise the contention as deallocations can come from different threads, but allocations will always come from one thread.
 - Central policy : There will be segment level locking.
 - Single thread policy : No locks at all.
 
@@ -224,15 +232,9 @@ LocalHeapType* ScalableAllocatorType::get_thread_local_heap()
 ```
 
 To debug that example , check "injecting thread specific behaviour" example from the examples directory.
- 
+
 Thread exit handling : Another common problem in thread caching allocators is exits of short living threads. When they exit, their unused memory may be a problem. ScalableAllocator class will automatically transfer unused memory of exiting threads to the central heap.
  
-## <a name="huge_page"></a>Huge page usage
-
-You can utilise huge pages in Arena template class specialisation. An example for a local allocator is provided in the examples directory. You can also see the local allocator benchmark to observe the difference with huge pages.
-
-On Linux if transparent huge pages are disabled, metamalloc will use the huge page flag during mmap call. If THP is enabled, then it will use madvise.
-
 ## <a name="metadata"></a>Metadata
 
 - Logical page headers : All logical pages use a 64 byte header.
@@ -270,21 +272,31 @@ Alternatively to introduce your own recycling policy, you can go with PageRecycl
 
 ## <a name="deallocation_lookups"></a>Deallocation lookups
 
-1. Finding out size class from a pointer : SimpleHeapPow2 example calls "owns_pointer" method of big object segment. That involves a linear search through logical pages in the big object segment. However the performance will be ok as long as you have few numbers of logical pages for big objects. The design trade off here is that , allocators typically use allocation header per allocation , however I didn't prefer this method to minimise virtual memory footprint of metamalloc.
+- ScalableAllocator layer : The framework assumes all thread local heaps hold contigious memory. This allows ScalableAllocator to quickly find the owner heap.
 
-2. Reaching directly to logical page header from a pointer : The ideal way is to pass aligned ( aligned to your choice of logical page size ) buffers to segments. If that is done , then you can specify that in the last template argument as in SimpleHeapPow2 :
+- Heap layer : That will depend on the heap implementation. The underlying Segment implementation provides 2 ways :
+
+1. If the logical page addresses are aligned to the logical page addresses, Segment::get_size_class_from_address can be used. It will do a fast look up which involves applying a mask to the pointer to find out size class by accessing logical page header.
+
+2. Otherwise, Segment::owns_pointer can be used. That method will do a linear search through its logical pages to find out the ownership.
+
+That is driven by the last template argument of Segment class "bool aligned_logical_page_addresses". In SimpleHeapPow2 :
 
 ```cpp
 using SegmentSmallObject = Segment <concurrency_policy, SmallObjectLogicalPageType, 
-                                    ArenaType, page_recycling_policy, true>;  //  We place small object logical pages at aligned addresses
+                                    ArenaType, page_recycling_policy, true>;  //  We place small object logical pages at addresses aligned to logical page sizes so the last template arg is true
 
 using SegmentBigObject   = Segment <concurrency_policy, BigObjectLogicalPageType,   
-                                    ArenaType, page_recycling_policy, false>; //  But not for big objectsegment , hence false
+                                    ArenaType, page_recycling_policy, false>; //  But that doesn't apply to the big object segment , so the last template arg is false
 ```
 
-As for the first one, the deallocation will be fast in segment layer as it will be finding out the logical page by bitwise masking addresses. In the second case though, segment layer will need to do a linear search through the logical pages it holds.
+SimpleHeapPow2 initially uses the 2nd method to find out if it is a big object or small object. If it is a small object , then it finds out the size class with the 1st method.
 
-As for performance deallocation performance of your allocator, you should always go with 1st option. On the other hand the 2nd option may be ok in case where you know segment will not be holding many logical pages but few only.
+## <a name="huge_page"></a>Huge page usage
+
+You can utilise huge pages in Arena template class specialisation. An example for a local allocator is provided in the examples directory. You can also see the local allocator benchmark to observe the difference with huge pages.
+
+On Linux if transparent huge pages are disabled, metamalloc will use the huge page flag during mmap call. If THP is enabled, then it will use madvise.
 
 ## <a name="error_handling_and_leak_checking"></a>Error handling & leak checking
 
@@ -327,7 +339,7 @@ After that you navigate to address:port_number in your browser. You can check "m
 
 ## <a name="version_history"></a>Version history
 
-- 1.0.1 : Refactorings
+- 1.0.1 : Refactorings , no functional change
 - 1.0.0 : Initial version 
 
 ## <a name="contact"></a>Contact
