@@ -36,6 +36,7 @@
 #include <fcntl.h>
 #include <cstring>
 #include <cstdlib>
+#include <sys/personality.h>
 #ifdef ENABLE_NUMA // VOLTRON_EXCLUDE
 #include <numa.h>
 #include <numaif.h>
@@ -352,6 +353,37 @@ class VirtualMemory
             ret = VirtualFree(address, size, MEM_RELEASE) ? true : false;
             #endif
             return ret;
+        }
+        
+        static bool is_aslr_disabled()
+        {
+            #ifdef __linux__
+            return  personality(ADDR_NO_RANDOMIZE) & ADDR_NO_RANDOMIZE;
+            #elif _WIN32
+            // No implementation for Windows
+            return false;
+            #endif
+        }
+        
+        static bool disable_aslr()
+        {
+            #ifdef __linux__
+            const int old_personality = personality(ADDR_NO_RANDOMIZE);
+            
+            if (!(old_personality & ADDR_NO_RANDOMIZE)) 
+            {
+                const int new_personality = personality(ADDR_NO_RANDOMIZE);
+                
+                if (! (new_personality & ADDR_NO_RANDOMIZE))
+                {
+                    return false;
+                }
+            }
+            #elif _WIN32
+            // Linux only
+            return true;
+            #endif
+            return true;
         }
 
         static bool lock_all_pages()

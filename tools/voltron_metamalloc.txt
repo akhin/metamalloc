@@ -10,7 +10,7 @@ namespace=metamalloc
 ####################################################
 [HEADER]
 /*
-	METAMALLOC VERSION 1.0.1
+	METAMALLOC VERSION 1.0.2
 
 	MIT License
 
@@ -67,6 +67,7 @@ namespace=metamalloc
 #include <sched.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <sys/personality.h>
 #ifdef ENABLE_NUMA
 #include <numa.h>		
 #include <numaif.h>			

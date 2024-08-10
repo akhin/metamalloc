@@ -10,7 +10,7 @@ namespace=memlive
 ####################################################
 [HEADER]
 /*
-	MEMLIVE 1.0.1
+	MEMLIVE 1.0.2
 
 	MIT License
 

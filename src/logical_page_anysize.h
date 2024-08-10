@@ -12,9 +12,11 @@
 
 - IF THE PASSED BUFFER SIZE IS A MULTIPLE OF VM PAGE SIZE, THEN IT CAN HOLD MULTIPLE CONTIGUOUS VM PAGES, SIMILARLY TO SPANS/PAGE RUNS
 
-- USES 16 BYTE ALLOCATION HEADER. HEDERS ARE PLACED JUST BEFORE THE PAYLOADS. DEALLOCATIONS USE THE INFO IN THOSE ALLOCATION HEADERS
+- USES 16 BYTE ALLOCATION HEADER. HEADERS ARE PLACED JUST BEFORE THE PAYLOADS. DEALLOCATIONS USE THE INFO IN THOSE ALLOCATION HEADERS
 
 - ALWAYS RETURNS 16 BYTE ALIGNED POINTERS
+
+- CURRENTLY SUPPORTS ONLY FIRST-FIT FOR SEARCHES
 
 - IF THE PASSED BUFFER SIZE IS SAME AS TYPICAL VM PAGE SIZE -> 4KB = 4096 bytes , THEN IT CAN HOLD :
 
@@ -397,6 +399,7 @@ private:
         find_internal(iterator, nullptr, size, previous_node, found_node, alignment, padding_bytes);
     }
 
+	// First-fit
     FORCE_INLINE void find_internal(NodeType*& __restrict search_start_node, NodeType* __restrict search_end_node, const std::size_t size, NodeType*& __restrict previous_node, NodeType*& __restrict found_node, const std::size_t alignment, std::size_t& padding_bytes)
     {
         NodeType* iterator = search_start_node;

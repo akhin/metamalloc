@@ -44,13 +44,13 @@ inline bool validate_buffer(void* buffer, std::size_t buffer_size)
     return true;
 }
 
-template <typename LogicalPageType>
+template <typename LogicalPageType, bool aligned_logical_page_addresses=true>
 bool run_test(const std::string name, std::size_t logical_page_buffer_size, uint16_t size_class, std::size_t logical_page_count, std::size_t allocation_count, bool is_anysize)
 {
     //////////////////////////////////////
     // CHECK CREATION FAILURES
     {
-        Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPageType, Arena<>> segment;
+        Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPageType, Arena<>, PageRecyclingPolicy::IMMEDIATE, aligned_logical_page_addresses> segment;
         Arena<> arena;
         bool success = arena.create(65536 * 10, logical_page_buffer_size);
         if (!success) { std::cout << "ARENA CREATION FAILED !!!" << std::endl; return false; }
@@ -65,7 +65,7 @@ bool run_test(const std::string name, std::size_t logical_page_buffer_size, uint
         unit_test.test_equals(success, false, "creation checks " + name, "invalid segment creation argument");
     }
     //////////////////////////////////////
-    Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPageType, Arena<>> segment;
+    Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPageType, Arena<>, PageRecyclingPolicy::IMMEDIATE, aligned_logical_page_addresses> segment;
     Arena<> arena;
     bool success = arena.create(65536 * 10, logical_page_buffer_size);
     if (!success) { std::cout << "ARENA CREATION FAILED !!!" << std::endl; return false; }
@@ -98,7 +98,8 @@ bool run_test(const std::string name, std::size_t logical_page_buffer_size, uint
             allocation.ptr = ptr;
             allocations.push_back(allocation);
 
-            bool is_page_header_good = size_class == Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPage<>, Arena<>>::get_size_class_from_address(ptr, logical_page_buffer_size);
+            
+            bool is_page_header_good = size_class == Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPage<>, Arena<>, PageRecyclingPolicy::IMMEDIATE, aligned_logical_page_addresses>::get_size_class_from_address(ptr, logical_page_buffer_size);
 
             if (is_page_header_good == false)
             {
@@ -106,6 +107,7 @@ bool run_test(const std::string name, std::size_t logical_page_buffer_size, uint
                 return false;
 
             }
+            
         }
         else
         {
@@ -165,13 +167,15 @@ bool run_test(const std::string name, std::size_t logical_page_buffer_size, uint
     // Deallocate all the rest
     for (auto& allocation : allocations)
     {
-        auto size_class = Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPage<>, Arena<>>::get_size_class_from_address(allocation.ptr, logical_page_buffer_size);
+        
+        auto size_class = Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPage<>, Arena<>, PageRecyclingPolicy::IMMEDIATE, aligned_logical_page_addresses>::get_size_class_from_address(allocation.ptr, logical_page_buffer_size);
 
         if (size_class != allocation.size_class)
         {
             std::cout << "PAGE HEADER VALIDATION FAILED : FOUND SIZECLASS IS WRONG !!!" << std::endl;
             return false;
         }
+        
 
         segment.deallocate(reinterpret_cast<void*>(allocation.ptr));
     }

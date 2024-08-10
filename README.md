@@ -276,7 +276,7 @@ Alternatively to introduce your own recycling policy, you can go with PageRecycl
 
 - Heap layer : That will depend on the heap implementation. The underlying Segment implementation provides 2 ways :
 
-1. If the logical page addresses are aligned to the logical page addresses, Segment::get_size_class_from_address can be used. It will do a fast look up which involves applying a mask to the pointer to find out size class by accessing logical page header.
+1. If the logical page addresses are aligned to the logical page sizes, Segment::get_size_class_from_address can be used. It will do a fast look up which involves applying a mask to the pointer to find out size class by accessing logical page header.
 
 2. Otherwise, Segment::owns_pointer can be used. That method will do a linear search through its logical pages to find out the ownership.
 
@@ -310,7 +310,7 @@ On Linux if transparent huge pages are disabled, metamalloc will use the huge pa
 
 - Valgrind, DrMemory and sanitizers : metamalloc doesn't use their api. Therefore in order to use them. you will need to switch to standard malloc. If you use ENABLE_DEFAULT_MALLOC before including the header , ScalableAlloctor will use the usual malloc. That way you can use Valgrind, Dr.Memory or sanitizers.
 
-- Leak checking : If you use #define ENABLE_REPORT_LEAKS before inclusion of metamalloc.h, it will report the missing deallocations. You can find "leak checking" example in the examples directory.
+- Leak checking : If you use #define ENABLE_REPORT_LEAKS before inclusion of metamalloc.h, it will create "leaks.txt" file with the missing deallocations. You can find "leak checking" example in the examples directory.
 
 ## <a name="memlive"></a>Memlive
 
@@ -339,6 +339,7 @@ After that you navigate to address:port_number in your browser. You can check "m
 
 ## <a name="version_history"></a>Version history
 
+- 1.0.2 : Leak reporting will create "leaks.txt" instead of console outputting, more static asserts, ASLR disabling api
 - 1.0.1 : Refactorings , no functional change
 - 1.0.0 : Initial version 
 

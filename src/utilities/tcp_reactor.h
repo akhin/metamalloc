@@ -10,6 +10,7 @@
 #include <vector>
 #include <memory>
 #include <thread>
+#include <mutex> // For std::lock_guard
 #include <unordered_map>
 #include "../os/socket.h"
 #include "../os/async_io_poller.h"

@@ -6,7 +6,7 @@
                 2. WE CAN GIVE COMPLETELY FREE PAGES BACK TO SYSTEM IF WE WILL NOT FALL UNDER "MINIMUM_LOGICAL_PAGES" THRESHOLD . OTHERWISE MEMORY CONSUMPTION OF ALLOCATOR WILL NEVER GO DOWN
                   ( WE LIMIT LOGICAL PAGES TO VM PAGE SIZES MORE EASILY SO THAT OBJECT DON'T END UP IN MULTIPLE PAGES )
 
-    - INITIALLY HAS CONTINOUS PAGES LIKE SPANS/PAGE RUNS. HOWEVER THAT CAN CHANGE IF IT IS AN UNBOUNDED SEGMENT
+    - INITIALLY HAS CONTIGIOUS LOGICAL PAGES LIKE SPANS/PAGE RUNS. HOWEVER THAT CAN CHANGE IF IT IS AN UNBOUNDED SEGMENT.
 
     - MINIMUM LOGICAL PAGE SIZE FOR LINUX IS 4KB/4096 ON LINUX AND 64KB/65536 ON WINDOWS. LOGICAL PAGE SIZE ALSO HAS TO BE A MULTIPLE OF VIRTUAL MEMORY PAGE ALLOCATION GRANULARITY.
 
@@ -17,6 +17,7 @@
 */
 #ifndef __SEGMENT_H__
 #define __SEGMENT_H__
+
 
 #include <cstddef>
 #include <cstdint>
@@ -47,10 +48,10 @@ enum class ConcurrencyPolicy
 {
                         // BOUNDEDNESS                    DESCRIPTION
 
-    THREAD_LOCAL,        // Bounded , can't grow            Partial locking needed. Deallocates just push ptrs to a spinlock based q and they quit, as they can come from multiple threads.
+    THREAD_LOCAL,       // Bounded , can't grow           Partial locking needed. Deallocates just push ptrs to a spinlock based q and they quit, as they can come from multiple threads.
                         //                                Allocs will come from only one thread and they do actual deallocation by consuming dealloc q.
     CENTRAL,            // Unbounded, can grow            Segment level locking needed
-    SINGLE_THREAD        // Unbounded, can grow            No locks
+    SINGLE_THREAD       // Unbounded, can grow            No locks
 };
 
 struct SegmentCreationParameters
@@ -86,7 +87,7 @@ template <
             typename LogicalPageType,
             typename ArenaType,
             PageRecyclingPolicy page_recycling_policy = PageRecyclingPolicy::IMMEDIATE,
-            bool aligned_logical_page_addresses = false
+            bool buffer_aligned_to_logical_page_size = false
         >
 class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
 {
@@ -351,6 +352,8 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
         // Constant time logical page look up method for finding logical pages if their start addresses are aligned to logical page size
         static LogicalPageType* get_logical_page_from_address(void* ptr, std::size_t logical_page_size)
         {
+            static_assert(buffer_aligned_to_logical_page_size == true);
+            
             uint64_t orig_ptr = reinterpret_cast<uint64_t>(ptr);
             // Masking below is equivalent of -> orig_ptr - ModuloUtilities::modulo(orig_ptr, logical_page_size);
             uint64_t target_page_address = orig_ptr & ~(logical_page_size - 1);
@@ -358,9 +361,11 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
             return target_logical_page;
         }
 
-        // Constant time size_class look up method for finding logical pages
+        // Constant time size_class look up method for finding logical pages if their start addresses are aligned to logical page size
         static uint32_t get_size_class_from_address(void* ptr, std::size_t logical_page_size)
         {
+            static_assert(buffer_aligned_to_logical_page_size == true);
+            
             LogicalPageType* target_logical_page = get_logical_page_from_address(ptr, logical_page_size);
             return target_logical_page->get_size_class();
         }
@@ -580,15 +585,29 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
             {
                 next = reinterpret_cast<LogicalPageType*>(iter->get_next_logical_page());
                 /////////////////////////////////////////////////////////////////////////////
-
                 #ifdef ENABLE_REPORT_LEAKS
                 if (iter->get_used_size() != 0)
                 {
-                    // Using fprintf with stderr so we don't allocate memory
-                    if(m_size_class!=0)
-                        fprintf(stderr, "Potential memory leak : sizeclass=%zu count=%zu\n", static_cast<std::size_t>(m_size_class), static_cast<std::size_t>(iter->get_used_size() / m_size_class));
+                    FILE* leak_report = nullptr;
+                    leak_report = fopen("leaks.txt", "a+"); // does not allocate memory
+            
+                    if (leak_report) 
+                    {
+                        if(m_size_class!=0)
+                        {
+                            fprintf(leak_report, "Potential memory leak : sizeclass=%zu count=%zu\n", static_cast<std::size_t>(m_size_class), static_cast<std::size_t>(iter->get_used_size() / m_size_class));
+                        }
+                        else
+                        {
+                            fprintf(leak_report, "Potential memory leak : total size=%zu \n", static_cast<std::size_t>(iter->get_used_size()));
+                        }
+                        
+                        fclose(leak_report);
+                    }
                     else
-                        fprintf(stderr, "Potential memory leak : total size=%zu \n", static_cast<std::size_t>(iter->get_used_size()));
+                    {
+                        fprintf(stderr, "Failed to open leaks.txt for writing\n"); // does not allocate memory
+                    }
                 }
                 #endif
 
@@ -613,9 +632,9 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
         }
 
         // DEALLOCATES ALL POINTERS IN THE DEALLOCATION QUEUE
-        // IF THE CALLER IS ALLOCATOR INITIAL POINTER WON'T BE DEALLOCATED BUT INSTEAD RETURNED THE CALLER
+        // IF THE CALLER IS ALLOCATOR INITIAL POINTER WON'T BE DEALLOCATED BUT INSTEAD RETURNED TO THE CALLER
         // TO SERVE ALLOCATIONS AS FAST AS POSSIBLE
-        template <bool is_caller_allocator=false>
+        template <bool return_initial_pointer=false>
         void* process_deallocation_queue()
         {
             void* ret = nullptr;
@@ -629,7 +648,7 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
                     break;
                 }
 
-                if constexpr (is_caller_allocator)
+                if constexpr (return_initial_pointer)
                 {
                     if (likely(ret != nullptr))
                     {
@@ -658,10 +677,10 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
             }
 
             ///////////////////////////////////////////////////////////////////
+            // Next-fit like , we start searching from where we left if possible
             void* ret = nullptr;
             LogicalPageType* iter = m_last_used ? m_last_used : m_head;
 
-            // Next-fit like , we start searching from where we left if possible
             while (iter)
             {
                 ret = iter->allocate(size);
@@ -776,7 +795,7 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
 
         void deallocate_internal(void* ptr)
         {
-            if constexpr (aligned_logical_page_addresses == true)
+            if constexpr (buffer_aligned_to_logical_page_size == true)
             {
                 deallocate_from_aligned_logical_page(ptr);
             }

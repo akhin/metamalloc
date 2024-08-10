@@ -57,8 +57,6 @@ class SimpleHeapPow2 : public HeapBase<SimpleHeapPow2<concurrency_policy, ArenaT
         {
             // SMALL OBJECTS
             std::size_t m_small_object_logical_page_size = 65536;
-            // Small object capacities , if a specific bin size specified , that specific value will be used
-            // otherwise m_small_object_capacity_per_size_class will be used
             std::size_t m_small_object_bin_page_counts[SimpleHeapPow2Constants::SMALL_OBJECT_BIN_COUNT] = { 1,1,1,1,1,1,1,1 };
             std::size_t m_small_object_page_recycling_threshold = 0;
             // BIG OBJECTS
@@ -70,7 +68,7 @@ class SimpleHeapPow2 : public HeapBase<SimpleHeapPow2<concurrency_policy, ArenaT
         };
 
         using SegmentSmallObject = Segment <concurrency_policy, SmallObjectLogicalPageType, ArenaType, page_recycling_policy, true>;  //  We place small object logical pages at aligned addresses
-        using SegmentBigObject   = Segment <concurrency_policy, BigObjectLogicalPageType,   ArenaType, page_recycling_policy, false>; //  But not for big object hence false
+        using SegmentBigObject   = Segment <concurrency_policy, BigObjectLogicalPageType,   ArenaType, page_recycling_policy, false>; //  But not for big objects hence false
 
         [[nodiscard]] bool create(const HeapCreationParams& params, ArenaType* arena)
         {

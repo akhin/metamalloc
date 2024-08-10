@@ -8,6 +8,8 @@ CLASSES:
                                                     get_current_core_id
                                                     pin_calling_thread_to_cpu_core
                                                     cache_flush
+													
+		ASLR										disable_aslr_for_this_process , Linux only
 
         MemoryStats                                 get_stats() & get_human_readible_size
 
@@ -120,6 +122,7 @@ GETTING INTEL PMC VALUES ( ONLY ON LINUX : PMC ACCESS NEED KERNEL MODE PRIVILEGE
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <linux/version.h>
+#include <sys/personality.h>
 #endif
 
 ///////////////////////////////////////////////////////////////////
@@ -668,6 +671,60 @@ class RandomNumberGenerator
             ret = distance_random(device);
             return ret;
         }
+};
+
+///////////////////////////////////////////////////////////////////
+// ASLR
+class ASLR
+{
+	public:
+			
+			static void disable_aslr_for_this_process(int argc, char* argv[])
+			{
+				#ifdef __linux__
+				auto aslr_disabled = is_aslr_disabled();
+
+				if(aslr_disabled==false)
+				{
+					auto success_disable_aslr = disable_aslr();
+
+					if(success_disable_aslr)
+					{
+						// RESTARTING
+						execv(argv[0], argv);
+					}
+				}
+				#endif
+			}
+	
+	        static bool is_aslr_disabled()
+			{
+				#ifdef __linux
+				return  personality(ADDR_NO_RANDOMIZE) & ADDR_NO_RANDOMIZE;
+				#else
+				return true;
+				#endif
+			}
+        
+			static bool disable_aslr()
+			{
+				#ifdef __linux__
+				const int old_personality = personality(ADDR_NO_RANDOMIZE);
+            
+				if (!(old_personality & ADDR_NO_RANDOMIZE)) 
+				{
+					const int new_personality = personality(ADDR_NO_RANDOMIZE);
+					
+					if (! (new_personality & ADDR_NO_RANDOMIZE))
+					{
+						return false;
+					}
+				}
+				#else
+				#endif
+				
+				return true;
+			}
 };
 
 ///////////////////////////////////////////////////////////////////
