@@ -33,7 +33,7 @@ int main()
     ptr = AllocatorType::get_instance().allocate(42);
     AllocatorType::get_instance().deallocate(ptr);
 
-    void*ptr2 = nullptr;
+    void* ptr2 = nullptr;
     ptr2 = AllocatorType::get_instance().allocate_aligned(512, AlignmentConstants::SIMD_AVX512_WIDTH);
     AllocatorType::get_instance().deallocate(ptr2);
 

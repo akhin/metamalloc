@@ -1,5 +1,5 @@
 #include "../unit_test.h" // Always should be the 1st one as it defines UNIT_TEST macro
-#include "../../src/os/thread_utilities.h"
+#include "../../include/os/thread_utilities.h"
 
 #include "../../metamalloc.h"
 #include "../../examples/minimal_heap.h"
@@ -7,6 +7,7 @@ using namespace metamalloc;
 
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <thread>
 #include <vector>
 #include <mutex>
@@ -92,7 +93,7 @@ using PerThreadCachingAllocatorType = ScalableAllocator<
     Arena<>
 >;
 
-int main()
+int main(int argc, char* argv[])
 {
     bool success = false;
 
@@ -211,9 +212,17 @@ int main()
 
     ////////////////////////////////////// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("ScalableAllocator");
-
+    std::cout.flush();
+    
     #if _WIN32
-    std::system("pause");
+    bool pause = true;
+    if(argc > 1)
+    {
+        if (std::strcmp(argv[1], "no_pause") == 0)
+            pause = false;
+    }
+    if(pause)
+        std::system("pause");
     #endif
 
     return unit_test.did_all_pass();

@@ -3,14 +3,14 @@
 # First 3 lines are mandatory : source_path output_header and namespace
 # Then they have to be followed by [HEADER] [SYSTEM_LIBRARIES] and then [INCLUSIONS]
 # All inclusions in your source files will be ignored. Therefore SYSTEM_LIBRARIES shall have all you need.
-source_path=../src/
+source_path=../include/
 output_header=metamalloc.h
 # Namespace is optional / you can leave it as blank
 namespace=metamalloc
 ####################################################
 [HEADER]
 /*
-	METAMALLOC VERSION 1.0.2
+	METAMALLOC VERSION 1.0.3
 
 	MIT License
 
@@ -87,6 +87,8 @@ namespace=metamalloc
 #ifdef _WIN32
 #include <windows.h>
 #include <fibersapi.h>
+#include <chrono>
+#include <thread>
 #endif
 // UNIT TESTS
 #ifdef UNIT_TEST
@@ -95,7 +97,7 @@ namespace=metamalloc
 #endif
 ####################################################
 [INCLUSIONS]
-# LIST OF FILES , ORDER MATTERS AS THEY MAY HAVE INTERNAL DEPDENCIES :
+# LIST OF FILES , ORDER MATTERS AS THEY MAY HAVE INTERNAL DEPENDENCIES :
 ####################################################
 #CHECKS FIRST
 compiler/checks.h

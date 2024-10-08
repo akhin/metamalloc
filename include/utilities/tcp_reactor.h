@@ -13,7 +13,6 @@
 #include <mutex> // For std::lock_guard
 #include <unordered_map>
 #include "../os/socket.h"
-#include "../os/async_io_poller.h"
 #include "userspace_spinlock.h"
 
 template <typename SocketType>
@@ -23,9 +22,9 @@ class Connectors
 
         Connectors()
         {
-            m_connector_sockets.reserve(DEFAULT_MAX_DESCRIPTOR_COUNT);
-            m_connector_sockets_connection_flags.reserve(DEFAULT_MAX_DESCRIPTOR_COUNT);
-            m_connector_socket_index_table.reserve(DEFAULT_MAX_DESCRIPTOR_COUNT);
+            m_connector_sockets.reserve(DEFAULT_ASYNC_IO_MAX_DESCRIPTOR_COUNT);
+            m_connector_sockets_connection_flags.reserve(DEFAULT_ASYNC_IO_MAX_DESCRIPTOR_COUNT);
+            m_connector_socket_index_table.reserve(DEFAULT_ASYNC_IO_MAX_DESCRIPTOR_COUNT);
         }
 
         std::size_t get_capacity() const
@@ -100,12 +99,13 @@ class Connectors
         }
 
 private:
+    static constexpr std::size_t DEFAULT_ASYNC_IO_MAX_DESCRIPTOR_COUNT = 64;
     std::vector<std::unique_ptr<SocketType>> m_connector_sockets;
     std::vector<bool> m_connector_sockets_connection_flags;
     std::unordered_map<int, std::size_t> m_connector_socket_index_table;
 };
 
-template <typename TcpReactorImplementation>
+template <typename TcpReactorImplementation, typename AsyncIOPollerType>
 class TcpReactor
 {
     public:
@@ -180,7 +180,7 @@ class TcpReactor
 
                 int result = 0;
 
-                if constexpr(AsyncIOPoller<>::polls_per_socket() == false)
+                if constexpr(AsyncIOPollerType::polls_per_socket() == false)
                 {
                     result = m_asio_reader.get_number_of_ready_events();
                 }
@@ -191,7 +191,7 @@ class TcpReactor
 
                 if (result > 0)
                 {
-                    if constexpr (AsyncIOPoller<>::polls_per_socket() == false)
+                    if constexpr (AsyncIOPollerType::polls_per_socket() == false)
                     {
                         for (int counter{ 0 }; counter < result; counter++)
                         {
@@ -293,7 +293,7 @@ class TcpReactor
         std::unique_ptr<std::thread> m_reactor_thread;
         int m_accept_timeout_seconds = -1;
         Socket<SocketType::TCP> m_acceptor_socket;
-        AsyncIOPoller<> m_asio_reader;
+        AsyncIOPollerType m_asio_reader;
         std::atomic<bool> m_is_stopping = false;
         UserspaceSpinlock<> m_lock;
         TcpReactorImplementation& derived_class_implementation() { return *static_cast<TcpReactorImplementation*>(this); }

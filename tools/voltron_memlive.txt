@@ -3,14 +3,14 @@
 # First 3 lines are mandatory : source_path output_header and namespace
 # Then they have to be followed by [HEADER] [SYSTEM_LIBRARIES] and then [INCLUSIONS]
 # All inclusions in your source files will be ignored. Therefore SYSTEM_LIBRARIES shall have all you need.
-source_path=../src/
+source_path=../include/
 output_header=memlive.h
 # Namespace is optional / you can leave it as blank
 namespace=memlive
 ####################################################
 [HEADER]
 /*
-	MEMLIVE 1.0.2
+	MEMLIVE 1.0.3
 
 	MIT License
 
@@ -87,10 +87,11 @@ namespace=memlive
 #include <Ws2tcpip.h>
 // WINDOWS , WE WANT IT AFTER LIVE PROFILER INCLUDES AS WINDOWS.H CAN'T BE INCLUDED BEFORE Ws2tcpip.h
 #include <windows.h>
+#include <chrono>
 #endif
 ####################################################
 [INCLUSIONS]
-# LIST OF FILES , ORDER MATTERS AS THEY MAY HAVE INTERNAL DEPDENCIES :
+# LIST OF FILES , ORDER MATTERS AS THEY MAY HAVE INTERNAL DEPENDENCIES :
 ####################################################
 #CHECKS FIRST
 compiler/checks.h
@@ -105,7 +106,7 @@ compiler/unused.h
 cpu/pause.h
 #OS LAYER
 os/socket.h
-os/async_io_poller.h
+os/epoll.h
 os/lock.h
 os/thread_utilities.h
 os/thread_local_storage.h

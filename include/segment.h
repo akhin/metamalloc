@@ -755,7 +755,7 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
 
                     if (ret != nullptr)
                     {
-                        m_last_used = iter;
+                        m_last_used = first_new_logical_page;
 
                         return ret;
                     }

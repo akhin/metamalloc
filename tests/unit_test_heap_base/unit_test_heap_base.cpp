@@ -1,10 +1,11 @@
 #include "../unit_test.h" // Always should be the 1st one as it defines UNIT_TEST macro
 
-#include "../../src/utilities/alignment_checks.h"
-#include "../../src/arena.h"
-#include "../../src/heap_base.h"
+#include "../../include/utilities/alignment_checks.h"
+#include "../../include/arena.h"
+#include "../../include/heap_base.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 #include <iostream>
 using namespace std;
@@ -89,7 +90,7 @@ class DummyHeap : public HeapBase<DummyHeap<ArenaType, DummyHeapCreationsParamsT
     private:
 };
 
-int main()
+int main(int argc, char* argv[])
 {
     DummyHeap<Arena<>, DummyHeapCreationsParams> heap;
     Arena<> arena;
@@ -114,9 +115,17 @@ int main()
 
     ////////////////////////////////////// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("HeapBase");
-
+    std::cout.flush();
+    
     #if _WIN32
-    std::system("pause");
+    bool pause = true;
+    if(argc > 1)
+    {
+        if (std::strcmp(argv[1], "no_pause") == 0)
+            pause = false;
+    }
+    if(pause)
+        std::system("pause");
     #endif
 
     return unit_test.did_all_pass();

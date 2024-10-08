@@ -6,7 +6,7 @@
                 static bool is_hyper_threading()
 
                 static inline void yield()
-                static inline void sleep_in_microseconds(unsigned long microseconds)
+                static inline void sleep_in_nanoseconds(unsigned long nanoseconds)
 
                 static int get_current_core_id()
                 static unsigned long get_current_thread_id()
@@ -27,6 +27,8 @@
 #include <time.h>
 #elif _WIN32            // VOLTRON_EXCLUDE
 #include <windows.h>
+#include <chrono>
+#include <thread>
 #endif                    // VOLTRON_EXCLUDE
 
 #include <array>
@@ -162,26 +164,16 @@ class ThreadUtilities
             SwitchToThread();
             #endif
         }
-
-        static inline void sleep_in_microseconds(unsigned long microseconds)
+        
+        static inline void sleep_in_nanoseconds(unsigned long nanoseconds)
         {
             #ifdef __linux__
-            usleep(microseconds);
+            struct timespec ts;
+            ts.tv_sec = 0;
+            ts.tv_nsec = nanoseconds;
+            nanosleep(&ts, nullptr);
             #elif _WIN32
-            // In Windows , the sleep granularity is 1 millisecond , therefore min wait will be 1000 microsecs
-            if (microseconds < 1000)
-            {
-                Sleep(1);
-                return;
-            }
-            else
-            {
-                auto iterations = microseconds / 1000;
-                for (unsigned long i{ 0 }; i < iterations; i++)
-                {
-                    Sleep(1);
-                }
-            }
+            std::this_thread::sleep_for(std::chrono::nanoseconds(nanoseconds));
             #endif
         }
 

@@ -26,5 +26,8 @@ cl.exe /EHsc /std:c++17 /D NDEBUG /O2 %TRANSLATION_UNIT_NAME%.cpp /Fe:%TRANSLATI
 REM Delete the object file generated during compilation
 del %TRANSLATION_UNIT_NAME%.obj
 
-REM Pause the script so you can see the build output
-pause
+REM Check for "no_pause" argument
+if not "%~1" == "no_pause" (
+    REM Pause the script so you can see the build output
+    pause
+)

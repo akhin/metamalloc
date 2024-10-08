@@ -283,9 +283,9 @@ class VirtualMemory
 
             ret = mmap(hint_address, size, PROT_READ | PROT_WRITE, flags, -1, 0);
 
-            if (ret == nullptr)
+            if (ret == nullptr || ret == MAP_FAILED)
             {
-                return ret;
+                return nullptr;
             }
 
             if constexpr (use_hugepage)

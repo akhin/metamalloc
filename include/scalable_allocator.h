@@ -102,6 +102,11 @@ public:
     {
         m_cached_thread_local_heap_count = count;
     }
+    
+    void enable_fast_shutdown() 
+    {
+        m_fast_shutdown = true;
+    }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ALIGN_CODE(AlignmentConstants::CACHE_LINE_SIZE) [[nodiscard]]
@@ -350,21 +355,28 @@ public:
     [[nodiscard]] void* reallocate(void* ptr, std::size_t size)
     {
         if (ptr == nullptr)
+        {
             return  allocate(size);
+        }
 
         if (size == 0)
         {
             deallocate(ptr);
             return nullptr;
         }
+        
+        std::size_t old_size = get_usable_size(ptr);
+        
+        if(size <= old_size)
+        {
+            return ptr;
+        }
 
         void* new_ptr = allocate(size);
 
         if (new_ptr != nullptr)
         {
-            std::size_t old_size = get_usable_size(ptr);
-            std::size_t copy_size = (old_size < size) ? old_size : size;
-            builtin_memcpy(new_ptr, ptr, copy_size);
+            builtin_memcpy(new_ptr, ptr, old_size);
             deallocate(ptr);
         }
 
@@ -374,22 +386,29 @@ public:
     [[nodiscard]] void* aligned_reallocate(void* ptr, std::size_t size, std::size_t alignment)
     {
         if (ptr == nullptr)
+        {
             return  allocate_aligned(size, alignment);
-
+        }
 
         if (size == 0)
         {
             deallocate(ptr);
             return nullptr;
         }
+        
+        std::size_t old_size = get_usable_size(ptr);
+        
+        if(size <= old_size)
+        {
+            return ptr;
+        }
 
         void* new_ptr = allocate_aligned(size, alignment);
 
         if (new_ptr != nullptr)
         {
-            std::size_t old_size = get_usable_size(ptr);
-            std::size_t copy_size = (old_size < size) ? old_size : size;
-            builtin_memcpy(new_ptr, ptr, copy_size);
+            
+            builtin_memcpy(new_ptr, ptr, old_size);
             deallocate(ptr);
         }
 
@@ -418,7 +437,7 @@ private:
     std::size_t m_active_local_heap_count = 0;
     std::size_t m_max_thread_local_heap_count = 0;    // Used for only thread local heaps
     std::size_t m_cached_thread_local_heap_count = 0; // Used for only thread local heaps , its number of available passive heaps
-
+    bool m_fast_shutdown = false;
     typename LocalHeapType::HeapCreationParams m_local_heap_creation_params;
 
     static inline std::atomic<bool> m_initialised_successfully = false;
@@ -448,6 +467,13 @@ private:
     {
         #ifdef ENABLE_STATS
         save_stats_to_file("metamalloc_stats.txt");
+        #endif
+        
+        #ifndef ENABLE_REPORT_LEAKS
+        if(m_fast_shutdown)
+        {
+            return;
+        }
         #endif
 
         if(m_initialised_successfully.load() == true )

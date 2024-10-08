@@ -8,6 +8,7 @@ using namespace metamalloc;
 #include <iostream>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 using namespace std;
@@ -131,7 +132,7 @@ bool validate_aligned_allocation(HeapType* heap, std::size_t allocation_size, st
     return true;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     std::vector<std::size_t> size_classes = { 16,32,64,128,256,512,1024,2048 };
 
@@ -643,9 +644,17 @@ int main()
 
     ////////////////////////////////////// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("simple_heap_pow2");
-
+    std::cout.flush();
+    
     #if _WIN32
-    std::system("pause");
+    bool pause = true;
+    if(argc > 1)
+    {
+        if (std::strcmp(argv[1], "no_pause") == 0)
+            pause = false;
+    }
+    if(pause)
+        std::system("pause");
     #endif
 
     return unit_test.did_all_pass();

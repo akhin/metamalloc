@@ -34,12 +34,12 @@ int main()
     void* ptr = nullptr;
     ptr = AllocatorType::get_instance().allocate(42);
     UNUSED(ptr);
-	
-	void* ptr2 = nullptr;
+    
+    void* ptr2 = nullptr;
     ptr2 = AllocatorType::get_instance().allocate(42*2);
     UNUSED(ptr2);
 
-    // Creating a leak as we don't deallocate
+    // Creating leaks as we don't deallocate
     // AllocatorType::get_instance().deallocate(ptr);
 
     // The "leaks.txt" report file will appear in the same directory

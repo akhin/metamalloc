@@ -1,9 +1,10 @@
 #include "../unit_test.h" // Always should be the 1st one as it defines UNIT_TEST macro
 
-#include "../../src/compiler/unused.h"
-#include "../../src/deallocation_queue.h"
+#include "../../include/compiler/unused.h"
+#include "../../include/deallocation_queue.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <atomic>
 #include <vector>
 #include <thread>
@@ -27,7 +28,7 @@ public:
     }
 };
 
-int main()
+int main(int argc, char* argv[])
 {
     static_assert( sizeof(PointerPage) == 65536);
 
@@ -155,9 +156,17 @@ int main()
 
     ////////////////////////////////////// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("deallocation queue");
-
+    std::cout.flush();
+    
     #if _WIN32
-    std::system("pause");
+    bool pause = true;
+    if(argc > 1)
+    {
+        if (std::strcmp(argv[1], "no_pause") == 0)
+            pause = false;
+    }
+    if(pause)
+        std::system("pause");
     #endif
 
     return unit_test.did_all_pass();

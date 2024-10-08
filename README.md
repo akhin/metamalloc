@@ -22,7 +22,7 @@ The repo also provides another no-dependencies single-header : memlive.h. You ca
 
 - Linux and Windows , GCC and MSVC. Tested versions : GCC 11.3.0, GCC9.4.0, MSVC2022, Ubuntu22.04, Windows11
 
-- Single header. You can browse the organised source under "src". I use a py script that I call as voltron to generate the single header. Voltron.py is under tools directory. 
+- Single header. You can browse the organised source under "include". I use a py script that I call as voltron to generate the single header. Voltron.py is under tools directory. 
 
 - Integrations: You can include the header and call its allocation methods. Also examples for building a LD_PRELOADable shared object on Linux and statically linked DLL on Windows are provided. See the integration section below for details.
 
@@ -70,7 +70,6 @@ The systems used for benchmarks :
 | metamalloc      | SimpleHeapPow2                                    |       2.358,243                  |  10810 microseconds              |
 
 **Multithreaded thread-caching global allocator benchmark :** Global allocator benchmarks are done via LD_PRELOAD'ed shared objects on Linux and via statically linked DLLs on Windows.
-You can find prebuilt zipped binaries in the "benchmarks" directory and SO/DLL sources in the examples directory. 
 
 ( The Linux shared objects require GNU LIB C 2.35 runtime as they are built on Ubuntu22.4 . If you are using a different one, the zip file also contains a text file with steps to build tcmalloc,IntelOneTBB and metamalloc shared objects. )
 
@@ -122,7 +121,7 @@ using AllocatorType = ScalableAllocator<CentralHeapType, LocalHeapType>;
 
 ```
 
-As for thread caching, that is the most common model as it is scalable and has minimised lock contention ( explained more in detail in multithreading section ). 
+As for thread caching, that is the most common model as it is scalable and has minimised lock contention ( explained more in detail in the multithreading section ). 
 You will have heaps per thread via thread local storage mechanism. If thread local heaps exhaust, then allocations will failover to the central heap.
 
 Check "thread caching global allocator" example in the examples directory to debug the above one. Note that you can also specialise ScalableAllocator template methods to inject thread specific behaviour. For that one, see the multithreading section.
@@ -306,7 +305,7 @@ On Linux if transparent huge pages are disabled, metamalloc will use the huge pa
 
 - Allocations returning nullptr : That may happen due to out of memory. Another reason may be that an allocation size exceeds the maximum allocation that your heap can handle. For example , in SimpleHeapPow2 , maximum allocation size is same as big object logical page size. If that is the case , then you will need to use a higher logical page size for your segments that handles the largest sizes. Not every path of every software check allocation failures therefore this may come as a crash or even worse an odd behaviour which doesn't lead to a crash.
 
-- Issues with LD_PRELOAD'ed shared object or intercepting DLL : First try to repro the issue with building your app by including metamalloc as a library. If you are unable to repro, then you may need to add more redirections to SO/DLL. You can use strace on Linux and drstrace on Windows to get a list of those.
+- Issues with LD_PRELOAD'ed shared object or intercepting DLL : First try to repro the issue with building your app by including metamalloc as a library. If you are unable to repro, then you may need to add more redirections to SO/DLL. You can use ltrace on Linux and APIMonitor on Windows to get a list of those.
 
 - Valgrind, DrMemory and sanitizers : metamalloc doesn't use their api. Therefore in order to use them. you will need to switch to standard malloc. If you use ENABLE_DEFAULT_MALLOC before including the header , ScalableAlloctor will use the usual malloc. That way you can use Valgrind, Dr.Memory or sanitizers.
 
@@ -317,6 +316,7 @@ On Linux if transparent huge pages are disabled, metamalloc will use the huge pa
 In order to use it :
 
 ```cpp
+//#define MEMLIVE_MAX_SIZE_CLASS_COUNT 21 // 21 is the default in memlive.h so it will captures allocs up to 2^(21-1)/1 mb,  increase it if you need more
 #include "memlive.h"
 using namespace memlive;
 ...				
@@ -326,6 +326,8 @@ memlive_start(address, port_number);
 ( On Windows, make sure that memlive.h is included before windows.h inclusion. That is due to a conflict between ws2tcpip.h and windows.h. )
 
 After that you navigate to address:port_number in your browser. You can check "memlive example" in the examples directory.
+
+- You can adjust the max allocation size to capture by defining MEMLIVE_MAX_SIZE_CLASS_COUNT before including memlive.h. If not defined it will be defaulted to 21 which will capture allocations up to 1MB.
 
 - In order to view total peak size, select "Total" in the left hand side drop down list. Overall peak usage will appear in the most bottom row.
 
@@ -339,6 +341,7 @@ After that you navigate to address:port_number in your browser. You can check "m
 
 ## <a name="version_history"></a>Version history
 
+- 1.0.3 : Fixed memlive ui issue ( It was starting sizeclasses wrongly so everything was shifted ), Memlive max capture alloc size is now configurable via a macro, added fast shutdown to ScalableAllocator
 - 1.0.2 : Leak reporting will create "leaks.txt" instead of console outputting, more static asserts, ASLR disabling api
 - 1.0.1 : Refactorings , no functional change
 - 1.0.0 : Initial version 

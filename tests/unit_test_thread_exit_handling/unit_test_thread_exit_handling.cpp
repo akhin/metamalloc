@@ -7,6 +7,7 @@ using namespace metamalloc;
 #include <vector>
 #include <memory>
 #include <thread>
+#include <cstring>
 #include <iostream>
 using namespace std;
 
@@ -21,7 +22,7 @@ ScalableAllocator<
 
 UnitTest unit_test;
 
-int main()
+int main(int argc, char* argv[])
 {
     constexpr std::size_t ARENA_CAPACITY = 2147483648; // 2GB
 
@@ -81,9 +82,17 @@ int main()
 
     ////////////////////////////////////// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("ThreadExitHandling");
-
+    std::cout.flush();
+    
     #if _WIN32
-    std::system("pause");
+    bool pause = true;
+    if(argc > 1)
+    {
+        if (std::strcmp(argv[1], "no_pause") == 0)
+            pause = false;
+    }
+    if(pause)
+        std::system("pause");
     #endif
 
     return unit_test.did_all_pass();

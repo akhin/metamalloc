@@ -23,7 +23,7 @@ PACKED
 (
     struct PointerPage
     {
-        static constexpr std::size_t POINTER_CAPACITY = 8190; // 8190=65536-(2*8)/8
+        static constexpr std::size_t POINTER_CAPACITY = 8190; // 8190=(65536-(2*8))/8
         PointerPage* m_next = nullptr;
         PointerPage* m_prev = nullptr;
         uint64_t m_pointers[POINTER_CAPACITY] = { 0 };

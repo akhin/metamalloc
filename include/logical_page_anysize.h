@@ -399,7 +399,7 @@ private:
         find_internal(iterator, nullptr, size, previous_node, found_node, alignment, padding_bytes);
     }
 
-	// First-fit
+    // First-fit
     FORCE_INLINE void find_internal(NodeType*& __restrict search_start_node, NodeType* __restrict search_end_node, const std::size_t size, NodeType*& __restrict previous_node, NodeType*& __restrict found_node, const std::size_t alignment, std::size_t& padding_bytes)
     {
         NodeType* iterator = search_start_node;

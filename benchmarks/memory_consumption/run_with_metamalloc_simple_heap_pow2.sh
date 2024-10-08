@@ -12,4 +12,4 @@ export metamalloc_simple_heappow2_deallocation_initial_queue_capacity=0
 export metamalloc_simple_heappow2_grow_coefficient=0
 export metamalloc_simple_heappow2_small_object_page_recycling_threshold=1
 export metamalloc_simple_heappow2_big_object_page_recycling_threshold=1
-LD_PRELOAD=./metamalloc_simple_heap_pow2.so ./benchmark
+LD_PRELOAD=../global_thread_caching_allocator/linux/metamalloc_simple_heap_pow2.so ./benchmark

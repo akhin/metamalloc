@@ -3,9 +3,10 @@
 #include <vector>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
-#include "../../src/utilities/alignment_checks.h"
-#include "../../src/arena.h"
+#include "../../include/utilities/alignment_checks.h"
+#include "../../include/arena.h"
 
 using namespace std;
 
@@ -52,7 +53,7 @@ inline bool validate_buffer(void* buffer, std::size_t buffer_size)
     return true;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     // ARENA BASIC
     {
@@ -161,9 +162,17 @@ int main()
 
     ////////////////////////////////////// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("Arena");
-
+    std::cout.flush();
+    
     #if _WIN32
-    std::system("pause");
+    bool pause = true;
+    if(argc > 1)
+    {
+        if (std::strcmp(argv[1], "no_pause") == 0)
+            pause = false;
+    }
+    if(pause)
+        std::system("pause");
     #endif
 
     return unit_test.did_all_pass();

@@ -2,10 +2,10 @@
 #define __LOGICAL_PAGE_COMMON_TESTS_H__
 
 #include <string>
-#include "../../src/arena.h"
-#include "../../src/logical_page.h"
-#include "../../src/logical_page_anysize.h"
-#include "../../src/os/thread_utilities.h"
+#include "../../include/arena.h"
+#include "../../include/logical_page.h"
+#include "../../include/logical_page_anysize.h"
+#include "../../include/os/thread_utilities.h"
 
 bool validate_buffer(void* buffer, std::size_t buffer_size);
 void test_padding_calculation();

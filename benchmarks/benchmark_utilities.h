@@ -8,8 +8,8 @@ CLASSES:
                                                     get_current_core_id
                                                     pin_calling_thread_to_cpu_core
                                                     cache_flush
-													
-		ASLR										disable_aslr_for_this_process , Linux only
+
+        ASLR                                        disable_aslr_for_this_process , Linux only
 
         MemoryStats                                 get_stats() & get_human_readible_size
 
@@ -18,7 +18,7 @@ CLASSES:
         Console                                     console_output_with_colour
 
         LinuxInfo                                   Linux kernel version & CPU Isolation info
-        
+
         PMCUtilities                                Intel Performance Counter Monitor values
                                                     Only on Linux , see "GETTING INTEL PMC VALUES" below
 
@@ -308,33 +308,33 @@ class Console
 class LinuxInfo
 {
     public:
-    
+
         static const std::string get_linux_kernel_version()
         {
             std::string ret;
-            
+
             unsigned int linux_version = LINUX_VERSION_CODE;
             unsigned int major = (linux_version >> 16) & 0xFF;
             unsigned int minor = (linux_version >> 8) & 0xFF;
             unsigned int revision = linux_version & 0xFF;
-            
+
             ret = std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(revision);
-            
+
             return ret;
         }
-        
+
         static const std::string get_cpu_isolation_info()
         {
             std::string result;
             std::array<char, 128> buffer;
-            
+
             FILE* pipe = popen("sudo cat /proc/cmdline | grep --color=auto isolcpus=", "r");
-            if (!pipe) 
+            if (!pipe)
             {
                 throw std::runtime_error("popen() failed!");
             }
-            
-            while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) 
+
+            while (fgets(buffer.data(), buffer.size(), pipe) != nullptr)
             {
                 result += buffer.data();
             }
@@ -507,6 +507,14 @@ public:
         return  static_cast<unsigned long long>(static_cast<double>(cycle_count) * time_per_cycle);
     }
 
+    static unsigned long long cpu_cycles_to_nanoseconds(unsigned long long cycle_count, unsigned long long cpu_frequency_hertz)
+    {
+        // cpu_frequency is number of cycles per 1 sec/1000000000 nanoseconds
+        // So each cycle takes 1000000000/cpu_frequency_hertz nanoseconds
+        double time_per_cycle = 1000000000.0 / static_cast<double>(cpu_frequency_hertz);
+        return  static_cast<unsigned long long>(static_cast<double>(cycle_count) * time_per_cycle);
+    }
+
     void start()
     {
         m_start_cycles = get_cycles();
@@ -526,6 +534,11 @@ public:
     unsigned long long get_elapsed_microseconds(unsigned long long cpu_frequency_hertz)
     {
         return  cpu_cycles_to_microseconds(get_elapsed_cycles(), cpu_frequency_hertz);
+    }
+
+    unsigned long long get_elapsed_nanoseconds(unsigned long long cpu_frequency_hertz)
+    {
+        return  cpu_cycles_to_nanoseconds(get_elapsed_cycles(), cpu_frequency_hertz);
     }
 
 private:
@@ -677,54 +690,54 @@ class RandomNumberGenerator
 // ASLR
 class ASLR
 {
-	public:
-			
-			static void disable_aslr_for_this_process(int argc, char* argv[])
-			{
-				#ifdef __linux__
-				auto aslr_disabled = is_aslr_disabled();
+    public:
 
-				if(aslr_disabled==false)
-				{
-					auto success_disable_aslr = disable_aslr();
+            static void disable_aslr_for_this_process(int argc, char* argv[])
+            {
+                #ifdef __linux__
+                auto aslr_disabled = is_aslr_disabled();
 
-					if(success_disable_aslr)
-					{
-						// RESTARTING
-						execv(argv[0], argv);
-					}
-				}
-				#endif
-			}
-	
-	        static bool is_aslr_disabled()
-			{
-				#ifdef __linux
-				return  personality(ADDR_NO_RANDOMIZE) & ADDR_NO_RANDOMIZE;
-				#else
-				return true;
-				#endif
-			}
-        
-			static bool disable_aslr()
-			{
-				#ifdef __linux__
-				const int old_personality = personality(ADDR_NO_RANDOMIZE);
-            
-				if (!(old_personality & ADDR_NO_RANDOMIZE)) 
-				{
-					const int new_personality = personality(ADDR_NO_RANDOMIZE);
-					
-					if (! (new_personality & ADDR_NO_RANDOMIZE))
-					{
-						return false;
-					}
-				}
-				#else
-				#endif
-				
-				return true;
-			}
+                if(aslr_disabled==false)
+                {
+                    auto success_disable_aslr = disable_aslr();
+
+                    if(success_disable_aslr)
+                    {
+                        // RESTARTING
+                        execv(argv[0], argv);
+                    }
+                }
+                #endif
+            }
+
+            static bool is_aslr_disabled()
+            {
+                #ifdef __linux
+                return  personality(ADDR_NO_RANDOMIZE) & ADDR_NO_RANDOMIZE;
+                #else
+                return true;
+                #endif
+            }
+
+            static bool disable_aslr()
+            {
+                #ifdef __linux__
+                const int old_personality = personality(ADDR_NO_RANDOMIZE);
+
+                if (!(old_personality & ADDR_NO_RANDOMIZE))
+                {
+                    const int new_personality = personality(ADDR_NO_RANDOMIZE);
+
+                    if (! (new_personality & ADDR_NO_RANDOMIZE))
+                    {
+                        return false;
+                    }
+                }
+                #else
+                #endif
+
+                return true;
+            }
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -900,16 +913,10 @@ class MemoryStats
 
 ///////////////////////////////////////////////////////////////////
 // DO_NOT_OPTIMISE
-#if defined(_MSC_VER)
-#define FORCE_INLINE __forceinline
-#elif defined(__GNUC__)
-#define FORCE_INLINE __attribute__((always_inline))
-#endif
-
 void dummy(char const volatile*){}
 
 template <typename T>
-FORCE_INLINE void DO_NOT_OPTIMISE(T const& value)
+void DO_NOT_OPTIMISE(T const& value)
 {
     // Disables compiler reordering of read and writes ( though it does not prevent CPU reordering )
     #if defined(_MSC_VER)

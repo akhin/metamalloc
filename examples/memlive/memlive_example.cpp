@@ -1,3 +1,4 @@
+//#define MEMLIVE_MAX_SIZE_CLASS_COUNT 21 // up to 2^(21-1)/1 mb increase if you need more
 #include "../../memlive.h"
 
 #include <cstdlib>
@@ -64,11 +65,11 @@ int main()
 
                     if (is_finishing.load() == true) { break; }
 
-                    memlive::ThreadUtilities::sleep_in_microseconds(thread_wait_in_usecs);
+                    memlive::ThreadUtilities::sleep_in_nanoseconds(thread_wait_in_usecs*1000);
                 }
             }
 
-            memlive::ThreadUtilities::sleep_in_microseconds(thread_wait_in_usecs);
+            memlive::ThreadUtilities::sleep_in_nanoseconds(thread_wait_in_usecs*1000);
         }
 
         for (auto ptr : pointers)

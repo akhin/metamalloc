@@ -26,6 +26,8 @@
 #define _UNIT_TEST_H_
 
 #include <cstdlib>
+#include <cmath>
+#include <limits>
 #include <array>
 #include <cstring>
 #include <string>
@@ -34,6 +36,7 @@
 #include <sstream>
 #include <random>
 #include <mutex>
+#include <type_traits>
 #include <iostream>
 
 #if __linux__
@@ -43,6 +46,8 @@
 #include <pthread.h>
 #elif _WIN32
 #include <windows.h>
+#include <chrono>
+#include <thread>
 #endif
 
 #define UNIT_TEST // Useful to distinguish unit-test-only code pieces in actual sources
@@ -148,20 +153,7 @@ class ConcurrencyTestUtilities
             #ifdef __linux__
             usleep(microseconds);
             #elif _WIN32
-            // In Windows , the sleep granularity is 1 millisecond , therefore min wait will be 1000 microsecs
-            if (microseconds < 1000)
-            {
-                Sleep(1);
-                return;
-            }
-            else
-            {
-                auto iterations = microseconds / 1000;
-                for (unsigned long i{ 0 }; i < iterations; i++)
-                {
-                    Sleep(1);
-                }
-            }
+            std::this_thread::sleep_for(std::chrono::microseconds(microseconds));
             #endif
         }
 
@@ -267,7 +259,16 @@ class UnitTest
         template <class T, class U>
         bool test_equals(T actual, U expected, const std::string& test_category, const std::string& test_case)
         {
-            auto evaluation = (actual == static_cast<T>(expected));
+            bool evaluation = false;
+
+            if constexpr (std::is_same_v<T, double>)
+            {
+                evaluation = are_doubles_same(actual, expected);
+            }
+            else
+            {
+                evaluation = (actual == static_cast<T>(expected));
+            }
 
             Console::console_output_with_colour(ConsoleColour::FG_YELLOW, "RUNNING: Category = " + test_category + " , Test case = " + test_case + '\n');
 
@@ -348,13 +349,18 @@ class UnitTest
 
     private:
         std::vector<UnitTestResult> m_results ={};
+
+        bool are_doubles_same (double a, double b)
+        {
+            return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
+        }
 };
 
 template <>
 bool UnitTest::test_equals(const char* actual, const char* expected, const std::string& test_category, const std::string& test_case)
 {
     bool evaluation = false;
-    
+
     if (actual && expected)
     {
         evaluation = strcmp(actual, expected) == 0;

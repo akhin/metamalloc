@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cstddef>
+#include <cstring>
 #include <cmath>
 #include <cstdlib>
 #include <vector>
@@ -13,7 +14,7 @@ static UnitTest unit_test;
 
 #include "logical_page_common_tests.h"
 
-int main()
+int main(int argc, char* argv[])
 {
     // LOGICAL PAGE HEADER SIZE
     unit_test.test_equals(sizeof(LogicalPageHeader), 64, "Logical page header size" , "Should be 64 bytes");
@@ -65,9 +66,17 @@ int main()
 
     //// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("Logical pages");
-
+    std::cout.flush();
+    
     #if _WIN32
-    std::system("pause");
+    bool pause = true;
+    if(argc > 1)
+    {
+        if (std::strcmp(argv[1], "no_pause") == 0)
+            pause = false;
+    }
+    if(pause)
+        std::system("pause");
     #endif
 
     return unit_test.did_all_pass();

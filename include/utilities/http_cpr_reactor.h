@@ -3,9 +3,9 @@
 
     ITS PARSER ONLY HANDLES CONNECTION-PER-REQUEST MODEL WHERE THERE WILL BE ONE UNIQUE TCP CONNECTION PER HTTP REQUEST
     THEREFORE THE PARSER DOES NOT CONSIDER INCOMPLETE BYTES 
-	
-	USE CASE :   IN SIMPLE HTTP APPS AJAX'S XMLHttpRequest FOR POST REQUEST , YOU CAN NOT REUSE AN EXISTING TCP CONNECTION
-				 Https://stackoverflow.com/questions/32505128/how-to-make-xmlhttprequest-reuse-a-tcp-connection
+    
+    USE CASE :   IN SIMPLE HTTP APPS AJAX'S XMLHttpRequest FOR POST REQUEST , YOU CAN NOT REUSE AN EXISTING TCP CONNECTION
+                 Https://stackoverflow.com/questions/32505128/how-to-make-xmlhttprequest-reuse-a-tcp-connection
 */
 #ifndef __HTTP_CPR_REACTOR_H__
 #define __HTTP_CPR_REACTOR_H__
@@ -16,6 +16,7 @@
 #include <string_view>
 #include <array>
 #include "../compiler/unused.h"
+#include "../os/epoll.h"
 #include "tcp_reactor.h"
 
 namespace HTTPConstants
@@ -80,7 +81,7 @@ class HttpResponse
 };
 
 template <typename HTTPCPRReactorImplementation>
-class HTTPCPRReactor : public  TcpReactor<HTTPCPRReactor<HTTPCPRReactorImplementation>>
+class HTTPCPRReactor : public  TcpReactor<HTTPCPRReactor<HTTPCPRReactorImplementation>, Epoll<>>
 {
 public:
 
@@ -109,23 +110,23 @@ public:
             read_buffer[read] = '\0';
             m_cache += read_buffer;
         }
-		else 
-		{
-			auto error = Socket<>::get_current_thread_last_socket_error();
-			
-			if( read == 0)
-			{
-				on_client_disconnected(peer_index);
-			}
-			else if (peer_socket->is_connection_lost_during_receive(error))
-			{
-				on_client_disconnected(peer_index);
-			}           
-			else if (error != 0)
-			{
-				this->on_socket_error(error, read);
-			}
-		}
+        else 
+        {
+            auto error = Socket<>::get_current_thread_last_socket_error();
+            
+            if( read == 0)
+            {
+                on_client_disconnected(peer_index);
+            }
+            else if (peer_socket->is_connection_lost_during_receive(error))
+            {
+                on_client_disconnected(peer_index);
+            }           
+            else if (error != 0)
+            {
+                this->on_socket_error(error, read);
+            }
+        }
 
         if (received_bytes > 0)
         {
@@ -191,7 +192,7 @@ public:
 
     void on_client_disconnected(std::size_t peer_index)
     {
-        TcpReactor<HTTPCPRReactor>::on_client_disconnected(peer_index);
+        TcpReactor<HTTPCPRReactor, Epoll<>>::on_client_disconnected(peer_index);
     }
 
     void on_async_io_error(int error_code, int event_result)

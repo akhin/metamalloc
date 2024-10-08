@@ -4,13 +4,13 @@
     If Linux kernel version is >= 5.11 then we will use epoll_pwait2 with nanosecond precision 
     otherwise we will use epoll_wait with millisecond precision
 */
-#ifndef _ASYNC_IO_POLLER_
-#define _ASYNC_IO_POLLER_
+#ifndef _EPOLL_H_
+#define _EPOLL_H_
 
 
 #include <cstddef>
 
-static constexpr std::size_t DEFAULT_MAX_DESCRIPTOR_COUNT = 64;
+static constexpr std::size_t DEFAULT_EPOLL_MAX_DESCRIPTOR_COUNT = 64;
 
 #ifdef __linux__
 
@@ -26,18 +26,18 @@ static constexpr std::size_t DEFAULT_MAX_DESCRIPTOR_COUNT = 64;
 #define EPOLL_PWAIT2_AVAILABLE 0
 #endif
 
-template<std::size_t MAX_DESCRIPTOR_COUNT = DEFAULT_MAX_DESCRIPTOR_COUNT>
-class AsyncIOPoller
+template<std::size_t MAX_DESCRIPTOR_COUNT = DEFAULT_EPOLL_MAX_DESCRIPTOR_COUNT>
+class Epoll
 {
 public:
-    AsyncIOPoller()
+    Epoll()
     {
         m_max_epoll_events = MAX_DESCRIPTOR_COUNT;
         m_epoll_descriptor = epoll_create1(0);
         m_epoll_events = new struct epoll_event[m_max_epoll_events];
     }
 
-    ~AsyncIOPoller()
+    ~Epoll()
     {
         if (m_epoll_descriptor >= 0)
         {
@@ -158,15 +158,15 @@ private:
 
 #include <Ws2tcpip.h>
 
-template<std::size_t MAX_DESCRIPTOR_COUNT = DEFAULT_MAX_DESCRIPTOR_COUNT>
-class AsyncIOPoller
+template<std::size_t MAX_DESCRIPTOR_COUNT = 0>  // Currently not used in select, just here to conform asynciopoller interface
+class Epoll
 {
     public:
 
-        AsyncIOPoller()
+        Epoll()
         {
             FD_ZERO(&m_query_set);
-			FD_ZERO(&m_result_set);
+            FD_ZERO(&m_result_set);
         }
 
         static constexpr bool polls_per_socket()

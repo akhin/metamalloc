@@ -1,11 +1,12 @@
 #include "../unit_test.h" // Always should be the 1st one as it defines UNIT_TEST macro
 
-#include "../../src/logical_page.h"
-#include "../../src/logical_page_anysize.h"
-#include "../../src/arena.h"
-#include "../../src/segment.h"
+#include "../../include/logical_page.h"
+#include "../../include/logical_page_anysize.h"
+#include "../../include/arena.h"
+#include "../../include/segment.h"
 
 #include <iostream>
+#include <cstring>
 #include <cstddef>
 #include <cstdlib>
 #include <vector>
@@ -183,7 +184,7 @@ bool run_test(const std::string name, std::size_t logical_page_buffer_size, uint
     return true;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     /////////////////////////////////////////////////////////////////////////////////
     std::size_t logical_page_count_per_segment = 32;
@@ -457,12 +458,65 @@ int main()
         }
 
     }
+    
+    // STRESS TEST 2
+    {
+        Arena<> arena;
+        
+        if (arena.create(static_cast<std::size_t>(1024) * 1024 * 1024 * 4, 65536))
+        {
+            Segment < ConcurrencyPolicy::THREAD_LOCAL, LogicalPageAnySize<>, Arena<>> segment;
+            char* buffer = arena.allocate(1024*1024*1024);
+
+            if (buffer)
+            {
+                SegmentCreationParameters params;
+                params.m_deallocation_queue_initial_capacity = 3276800;
+                params.m_grow_coefficient = 2;
+                params.m_logical_page_size = 1024 * 1024 * 512;
+                params.m_logical_page_count = 1;
+                params.m_page_recycling_threshold = 1000;
+
+                if (segment.create(buffer, &arena, params))
+                {
+                    std::vector<void*> pointers;
+                    std::vector<std::size_t> allocation_sizes = { 8192, 8192, 8192, 8192, 8192, 8192, 32768, 32768, 32768, 8192, 8192, 8192, 3456, 8192, 8192, 67108864, 67108864, 20000000, 2400000, 48000000, 2400000, 800000, 4800000, 2400000, 2400000, 800000, 212992 };
+
+                    for (const auto& alloc_size : allocation_sizes)
+                    {
+                        auto ptr = segment.allocate(alloc_size);
+
+                        if (ptr == nullptr)
+                        {
+                            std::cout << "Allocation failed\n";
+                            return -1;
+                        }
+
+                        pointers.push_back(ptr);
+                    }
+
+                    for (const auto& ptr : pointers)
+                    {
+                        segment.deallocate(ptr);
+                    }
+                }
+            }
+        }
+    }
 
     ////////////////////////////////////// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("Segment");
-
+    std::cout.flush();
+    
     #if _WIN32
-    std::system("pause");
+    bool pause = true;
+    if(argc > 1)
+    {
+        if (std::strcmp(argv[1], "no_pause") == 0)
+            pause = false;
+    }
+    if(pause)
+        std::system("pause");
     #endif
 
     return unit_test.did_all_pass();

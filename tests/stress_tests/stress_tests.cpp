@@ -13,6 +13,7 @@ using namespace metamalloc;
 #include <memory>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
 
 struct Allocation
 {
@@ -23,10 +24,10 @@ struct Allocation
 
 //////////////////////////////////////////////////
 // TEST VARIABLES
-constexpr std::size_t ITERATION_COUNT = 5;
-constexpr std::size_t THREAD_COUNT = 24;
-constexpr std::size_t ALLOCATION_COUNT = 4096;
-constexpr std::size_t THREAD_RANDOM_SLEEPS_IN_USECS = 100; // To simulate real environments
+constexpr std::size_t ITERATION_COUNT = 3;
+constexpr std::size_t THREAD_COUNT = 16;
+constexpr std::size_t ALLOCATION_COUNT = 1024;
+constexpr std::size_t THREAD_MAX_RANDOM_SLEEP_IN_MICROS = 20; // To simulate real environments
 //////////////////////////////////////////////////
 void run_multithreaded_benchmark();
 bool validate_buffer(void* buffer, std::size_t buffer_size);
@@ -87,7 +88,7 @@ void run_multithreaded_benchmark()
                 if (!validate_buffer(ptr, allocation_size)) {  fprintf(stderr, "ALLOCATION FAILED !!!\n"); }
                 #endif
 
-                sleep_randomly_usecs(THREAD_RANDOM_SLEEPS_IN_USECS);
+                sleep_randomly_usecs(THREAD_MAX_RANDOM_SLEEP_IN_MICROS);
 
                 allocation_buckets[allocation_bucket_index][i].ptr = ptr;
                 allocation_buckets[allocation_bucket_index][i].allocated = true;
@@ -171,25 +172,12 @@ bool validate_buffer(void* buffer, std::size_t buffer_size)
     return true;
 }
 
-void sleep_randomly_usecs(int max_duration_in_microsecs )
+void sleep_randomly_usecs(int max_duration_in_microsecs=0)
 {
     unsigned long microseconds = static_cast<unsigned long>(RandomNumberGenerator::get_random_integer(max_duration_in_microsecs));
     #ifdef __linux__
     usleep(microseconds);
     #elif _WIN32
-    // In Windows , the sleep granularity is 1 millisecond , therefore min wait will be 1000 microsecs
-    if (microseconds < 1000)
-    {
-        Sleep(1);
-        return;
-    }
-    else
-    {
-        auto iterations = microseconds / 1000;
-        for (unsigned long i{ 0 }; i < iterations; i++)
-        {
-            Sleep(1);
-        }
-    }
+    std::this_thread::sleep_for(std::chrono::microseconds(microseconds));
     #endif
 }

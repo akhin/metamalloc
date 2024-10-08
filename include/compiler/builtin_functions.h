@@ -43,6 +43,17 @@ inline int builtin_clzl(unsigned long value)
 #endif
 #endif
 
+#if defined(__GNUC__)
+#define builtin_clz(n)     __builtin_clz(n)
+#elif defined(_MSC_VER)
+#include <intrin.h>
+inline int builtin_clz(unsigned long value) // Implementation is for 32-bit only.
+{
+    unsigned long index = 0;
+    return _BitScanReverse(&index, value) ? static_cast<int>(31 - index) : 32;
+}
+#endif
+
 //////////////////////////////////////////////////////////////////////
 // Compare and swap, standard C++ provides them however it requires non-POD std::atomic usage
 // They are needed when we want to embed spinlocks in "packed" data structures which need all members to be POD such as headers
@@ -77,10 +88,10 @@ inline int builtin_clzl(unsigned long value)
 #include <cstdlib>
 #if defined(__GNUC__)
 #define builtin_aligned_alloc(size, alignment)  std::aligned_alloc(alignment, size)
-#define builtin_aligned_free(ptr)                 std::free(ptr)
+#define builtin_aligned_free(ptr)               std::free(ptr)
 #elif defined(_MSC_VER)
 #define builtin_aligned_alloc(size, alignment)  _aligned_malloc(size, alignment)
-#define builtin_aligned_free(ptr)                 _aligned_free(ptr)
+#define builtin_aligned_free(ptr)               _aligned_free(ptr)
 #endif
 
 //////////////////////////////////////////////////////////////////////
