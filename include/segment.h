@@ -97,6 +97,7 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
         {
             static_assert(std::is_base_of<ArenaBase<ArenaType>, ArenaType>::value);
             m_logical_page_object_size = sizeof(LogicalPageType);
+            assert( m_logical_page_object_size == sizeof(LogicalPageHeader) );
         }
 
         ~Segment()

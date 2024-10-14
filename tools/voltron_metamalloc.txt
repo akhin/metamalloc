@@ -10,7 +10,7 @@ namespace=metamalloc
 ####################################################
 [HEADER]
 /*
-	METAMALLOC VERSION 1.0.3
+	METAMALLOC VERSION 1.0.4
 
 	MIT License
 
@@ -52,6 +52,7 @@ namespace=metamalloc
 #include <array>
 #include <string_view>
 #include <new>
+#include <iterator>
 // CPU INTRINSICS
 #include <immintrin.h>
 #if defined(_MSC_VER)
@@ -130,13 +131,13 @@ utilities/multiple_utilities.h
 utilities/size_utilities.h
 utilities/userspace_spinlock.h
 utilities/lockable.h
+utilities/dictionary.h
 #ALLOCATOR LAYER
 arena_base.h
 arena.h
 logical_page_header.h
 logical_page_base.h
 logical_page.h
-logical_page_anysize.h
 deallocation_queue.h
 segment.h
 heap_base.h

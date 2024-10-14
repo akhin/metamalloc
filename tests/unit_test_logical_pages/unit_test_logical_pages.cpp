@@ -33,35 +33,10 @@ int main(int argc, char* argv[])
         // ERRORS
         test_errors<LogicalPage<>>();
 
-        // GENERAL TESTS LIFO TINY
-        test_general<LogicalPage<>, LogicalPageNode, CoalescePolicy::COALESCE>(65536); // Search and coalesce policies not used by LogicalPageLifoTiny
+        // GENERAL TESTS
+        test_general<LogicalPage<>, LogicalPageNode>(65536);
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // LOGICAL PAGE ANY SIZE TESTS
-
-    // ERRORS
-    test_errors<LogicalPageAnySize<>>();
-
-    // PADDING BYTES CALCULATION
-    test_padding_calculation();
-
-    // EXCESS BLOCK HANDLING ( No tests for LogicalPage as it always handles a single size )
-    test_excess_block_handling<LogicalPageAnySize<>, LogicalPageAnySizeNode>();
-
-    std::size_t allocation_size = 128;
-    test_exhaustion<LogicalPageAnySize<>, LogicalPageAnySizeNode>( (allocation_size + sizeof(LogicalPageAnySizeNode)) * 28, 28, allocation_size); // 4KB Page 48 bytes page header + Uses sizeof(NodeType) allocation header per allocation
-    test_exhaustion<LogicalPageAnySize<>, LogicalPageAnySizeNode>((allocation_size + sizeof(LogicalPageAnySizeNode)) * 455, 455, allocation_size); // 64k Page , 48 bytes page header + Uses sizeof(NodeType) allocation header per allocation
-
-
-    // GENERAL TESTS
-    test_general<LogicalPageAnySize<CoalescePolicy::COALESCE>, LogicalPageAnySizeNode, CoalescePolicy::COALESCE>(65536);
-    test_general<LogicalPageAnySize<CoalescePolicy::NO_COALESCING>, LogicalPageAnySizeNode, CoalescePolicy::NO_COALESCING>(65536);
-
-    if (test_extras_logical_page_any_size() != 0)
-    {
-        std::cout << "test_extras_logical_page_any_size failed !!!"; return -1;
-    }
 
 
     //// PRINT THE REPORT

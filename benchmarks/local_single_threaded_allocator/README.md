@@ -11,5 +11,3 @@ RUNNING THE BENCHMARKS - WINDOWS
 	For MS UCRT , run benchmark_standard_malloc.exe
 	For metamalloc , run benchmark_metamalloc.exe
 	For metamalloc with huge pages , run benchmark_metamalloc_hugepage.exe
-	
-	

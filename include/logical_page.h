@@ -61,9 +61,18 @@ class LogicalPage : public LogicalPageBase<LogicalPage<NodeType>, LogicalPageNod
 
             void* buffer_start_including_header = reinterpret_cast<void*>(reinterpret_cast<std::size_t>(buffer) - sizeof(*this)); // In case a caller is placing this object instance and the memory held by this instance sequentially
 
+
+            /*
+                There are 2 use cases
+                                1. A logical page can be standalone directly in that buffer should be aligned.
+                                2. A logical page will be managed by Segment and Segment will place this/LogicalPageHeader at the start of buffer , in that case buffer_start_including_header should be aligned
+
+                But two can't be non-aligned at the same time
+                
+            */
             if (!AlignmentChecks::is_address_page_allocation_granularity_aligned(buffer) && !AlignmentChecks::is_address_page_allocation_granularity_aligned(buffer_start_including_header))
             {
-                return false; // You have to pass start of actual virtual memory pages which will be page size aligned
+                return false;
             }
 
             this->m_page_header.initialise();
@@ -71,9 +80,6 @@ class LogicalPage : public LogicalPageBase<LogicalPage<NodeType>, LogicalPageNod
             this->m_page_header.m_logical_page_start_address = reinterpret_cast<uint64_t>(buffer);
             this->m_page_header.m_logical_page_size = buffer_size;
 
-            #ifdef UNIT_TEST
-            this->m_capacity = buffer_size;
-            #endif
             grow(buffer, buffer_size);
 
             return true;
@@ -106,7 +112,18 @@ class LogicalPage : public LogicalPageBase<LogicalPage<NodeType>, LogicalPageNod
             }
 
             this->m_page_header.m_used_size -= this->m_page_header.m_size_class;
-            push(static_cast<NodeType*>(ptr));
+            
+            /*
+                In case the upper layers handle aligned allocations by overallocating and incrementing the actual pointer, 
+                we can find out if that happened and find out original pointer we returned ,
+                since we know that the fixed sizeclass and logical page start address
+                
+                However if the freed ptr was not adjusted, this formula will not change the ptr which is being freed.
+                
+                    Formula : correct address =  base address + (  sizeclass *  std::floor(   (freed address - base address) / sizeclass  )  )
+             */
+             void* actual_ptr =  reinterpret_cast<void*>( this->m_page_header.m_logical_page_start_address + (this->m_page_header.m_size_class * (static_cast<uint64_t>(std::floor(  ( reinterpret_cast<uint64_t>(ptr) - this->m_page_header.m_logical_page_start_address) / this->m_page_header.m_size_class))) ));
+             push(static_cast<NodeType*>(actual_ptr));
         }
 
         std::size_t get_usable_size(void* ptr) { return  static_cast<std::size_t>(this->m_page_header.m_size_class); }

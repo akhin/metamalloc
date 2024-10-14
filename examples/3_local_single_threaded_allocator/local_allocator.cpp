@@ -17,9 +17,7 @@ int main()
     HeapType allocator;
 
     HeapType::HeapCreationParams params;
-    params.m_small_object_logical_page_size = 65536;
-    params.m_big_object_logical_page_size = 196608;
-    params.m_big_object_page_recycling_threshold = 1;
+    params.m_logical_page_size = 65536;
 
     success = allocator.create(params, &arena);
 

@@ -27,34 +27,7 @@ int main(int argc, char* argv[])
     constexpr std::size_t ARENA_CAPACITY = 2147483648; // 2GB
 
     CentralHeapType::HeapCreationParams params_central;
-    params_central.m_small_object_logical_page_size = 65536;
-    params_central.m_big_object_logical_page_size = 196608;
-    params_central.m_big_object_page_recycling_threshold = 2;
-
-    params_central.m_small_object_bin_page_counts[0] = 1;
-    params_central.m_small_object_bin_page_counts[1] = 1;
-    params_central.m_small_object_bin_page_counts[2] = 1;
-    params_central.m_small_object_bin_page_counts[3] = 1;
-    params_central.m_small_object_bin_page_counts[4] = 1;
-    params_central.m_small_object_bin_page_counts[5] = 1;
-    params_central.m_small_object_bin_page_counts[6] = 1;
-    params_central.m_small_object_bin_page_counts[7] = 1;
-    params_central.m_small_object_page_recycling_threshold =10;
-
     LocalHeapType::HeapCreationParams params_local;
-    params_local.m_small_object_logical_page_size = 65536;
-    params_local.m_big_object_logical_page_size = 196608;
-    params_local.m_big_object_page_recycling_threshold = 2;
-
-    params_local.m_small_object_bin_page_counts[0] = 1;
-    params_local.m_small_object_bin_page_counts[1] = 1;
-    params_local.m_small_object_bin_page_counts[2] = 1;
-    params_local.m_small_object_bin_page_counts[3] = 1;
-    params_local.m_small_object_bin_page_counts[4] = 1;
-    params_local.m_small_object_bin_page_counts[5] = 1;
-    params_local.m_small_object_bin_page_counts[6] = 1;
-    params_local.m_small_object_bin_page_counts[7] = 1;
-    params_local.m_small_object_page_recycling_threshold = 10;
 
     AllocatorType::get_instance().set_thread_local_heap_cache_count(1);
     bool success = AllocatorType::get_instance().create(params_central, params_local, ARENA_CAPACITY);
@@ -68,7 +41,7 @@ int main(int argc, char* argv[])
 
     auto central_heap = AllocatorType::get_instance().get_central_heap();
 
-    unit_test.test_equals(central_heap->get_big_object_bin_page_count(), 1, "thread exit handling", "logical page count before transfer");
+    unit_test.test_equals(central_heap->get_bin_logical_page_count(11), 1, "thread exit handling", "logical page count before transfer");
 
     std::vector<std::unique_ptr<std::thread>> threads;
     threads.emplace_back(new std::thread(thread_function, 0));
@@ -78,7 +51,7 @@ int main(int argc, char* argv[])
         thread->join();
     }
 
-    unit_test.test_equals(central_heap->get_big_object_bin_page_count(), 2, "thread exit handling", "logical page count after transfer");
+    unit_test.test_equals(central_heap->get_bin_logical_page_count(11), 2, "thread exit handling", "logical page count after transfer");
 
     ////////////////////////////////////// PRINT THE REPORT
     std::cout << unit_test.get_summary_report("ThreadExitHandling");

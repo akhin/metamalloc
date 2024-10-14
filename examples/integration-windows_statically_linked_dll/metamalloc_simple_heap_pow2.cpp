@@ -124,32 +124,26 @@ void initialise()
     std::size_t thread_local_heap_cache_count = EnvironmentVariable::get_variable("metamalloc_thread_local_heap_cache_count", 8);
 
     CentralHeapType::HeapCreationParams params_central;
-    params_central.m_small_object_logical_page_size         = EnvironmentVariable::get_variable("metamalloc_simple_heappow2_small_object_logical_page_size", 65536);
-    params_central.m_big_object_logical_page_size           = EnvironmentVariable::get_variable("metamalloc_simple_heappow2_big_object_logical_page_size", 655360);    // THIS SHOULD BE 16 BYTES MORE THAN THE LARGEST EXPECTED ALLOCATION SIZE
+    params_central.m_logical_page_size         = EnvironmentVariable::get_variable("metamalloc_simple_heappow2_logical_page_size", 65536);
     params_central.m_segment_grow_coefficient              = EnvironmentVariable::get_variable("metamalloc_simple_heappow2_grow_coefficient", 0.0);
-    params_central.m_small_object_page_recycling_threshold= EnvironmentVariable::get_variable("metamalloc_simple_heappow2_small_object_page_recycling_threshold", 1000);
-    params_central.m_big_object_page_recycling_threshold = EnvironmentVariable::get_variable("metamalloc_simple_heappow2_big_object_page_recycling_threshold", 1000);
+    params_central.m_logical_page_recycling_threshold= EnvironmentVariable::get_variable("metamalloc_simple_heappow2_logical_page_recycling_threshold", 1000);
 
     LocalHeapType::HeapCreationParams params_local;
-    params_local.m_small_object_logical_page_size            = params_central.m_small_object_logical_page_size;
-    params_local.m_big_object_logical_page_size           = params_central.m_big_object_logical_page_size;
-    params_local.m_small_object_page_recycling_threshold  = params_central.m_small_object_page_recycling_threshold;
+    params_local.m_logical_page_size            = params_central.m_logical_page_size;
+    params_local.m_logical_page_recycling_threshold  = params_central.m_logical_page_recycling_threshold;
     params_local.m_segment_deallocation_queue_initial_capacity      = EnvironmentVariable::get_variable("metamalloc_simple_heappow2_deallocation_queue_initial_capacity", 3276800);
-    params_local.m_big_object_page_recycling_threshold = params_central.m_big_object_page_recycling_threshold;
 
-    EnvironmentVariable::set_numeric_array_from_comma_separated_value_string(params_central.m_small_object_bin_page_counts, EnvironmentVariable::get_variable("metamalloc_simple_heappow2_central_page_counts", "1,1,1,1,1,1,1,1"));
-    EnvironmentVariable::set_numeric_array_from_comma_separated_value_string(params_local.m_small_object_bin_page_counts, EnvironmentVariable::get_variable("metamalloc_simple_heappow2_local_page_counts", "50,50,50,50,50,50,50,50"));
+    EnvironmentVariable::set_numeric_array_from_comma_separated_value_string(params_central.m_bin_logical_page_counts, EnvironmentVariable::get_variable("metamalloc_simple_heappow2_central_page_counts", "1,1,1,1,1,1,1,1,1,1,1,1"));
+    EnvironmentVariable::set_numeric_array_from_comma_separated_value_string(params_local.m_bin_logical_page_counts, EnvironmentVariable::get_variable("metamalloc_simple_heappow2_local_page_counts", "50,50,50,50,50,50,50,50,50,50,50,50"));
 
     trace_integer_value("metamalloc_simple_heappow2_arena_capacity", ARENA_CAPACITY);
     trace_integer_value("metamalloc_thread_local_heap_cache_count", thread_local_heap_cache_count);
-    trace_string_value("metamalloc_simple_heappow2_central_page_counts", EnvironmentVariable::get_variable("metamalloc_simple_heappow2_central_page_counts", "1,1,1,1,1,1,1,1"));
-    trace_string_value("metamalloc_simple_heappow2_local_page_counts", EnvironmentVariable::get_variable("metamalloc_simple_heappow2_local_page_counts", "50,50,50,50,50,50,50,50"));
-    trace_integer_value("metamalloc_simple_heappow2_small_object_logical_page_size", params_central.m_small_object_logical_page_size);
-    trace_integer_value("metamalloc_simple_heappow2_big_object_logical_page_size", params_central.m_big_object_logical_page_size);
+    trace_string_value("metamalloc_simple_heappow2_central_page_counts", EnvironmentVariable::get_variable("metamalloc_simple_heappow2_central_page_counts", "1,1,1,1,1,1,1,1,1,1,1,1"));
+    trace_string_value("metamalloc_simple_heappow2_local_page_counts", EnvironmentVariable::get_variable("metamalloc_simple_heappow2_local_page_counts", "50,50,50,50,50,50,50,50,50,50,50,50"));
+    trace_integer_value("metamalloc_simple_heappow2_logical_page_size", params_central.m_logical_page_size);
     trace_double_value("metamalloc_simple_heappow2_grow_coefficient", params_local.m_segment_grow_coefficient);
     trace_integer_value("metamalloc_simple_heappow2_deallocation_queue_initial_capacity", params_local.m_segment_deallocation_queue_initial_capacity);
-    trace_integer_value("metamalloc_simple_heappow2_small_object_page_recycling_threshold", params_local.m_small_object_page_recycling_threshold);
-    trace_integer_value("metamalloc_simple_heappow2_big_object_page_recycling_threshold", params_local.m_big_object_page_recycling_threshold);
+    trace_integer_value("metamalloc_simple_heappow2_logical_page_recycling_threshold", params_local.m_logical_page_recycling_threshold);
     /////////////////////////////////////////////////////////////////////////////////////////////
 
     if ( install_trampolines() == false )

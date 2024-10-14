@@ -29,6 +29,8 @@ class HeapBase
             If that is the case , override this method in your CRTP derived heap class
             And call this base method only if alignment size is small. Otherwise redirect it to a bin that uses logical_page_any_size ( for ex big object)
             as also logical_page_any_size can handle alignments and it will also be minimising used padding bytes during its search in its freelist
+            
+            As for deallocations, since LogicalPage holds free chunks for only one sizeclass and since it knows it start address, it re-adjusts the pointer during deallocation
         */
         ALIGN_CODE(AlignmentConstants::CACHE_LINE_SIZE) [[nodiscard]]
         void* allocate_aligned(std::size_t size, std::size_t alignment)

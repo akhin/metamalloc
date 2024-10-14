@@ -11,8 +11,6 @@ class MetamallocLocalAllocator
         using HeapType = SimpleHeapPow2<
                         ConcurrencyPolicy::SINGLE_THREAD,
                         Arena<LockPolicy::NO_LOCK>,
-                        LogicalPage<>,
-                        LogicalPageAnySize<>,
                         PageRecyclingPolicy::DEFERRED>;
 
         MetamallocLocalAllocator()
@@ -25,18 +23,17 @@ class MetamallocLocalAllocator
             }
 
             HeapType::HeapCreationParams params;
-            params.m_small_object_logical_page_size = 65536;
-            params.m_big_object_logical_page_size = 196608;
-            params.m_big_object_page_recycling_threshold = 4;
+            params.m_logical_page_size = 65536;
+            params.m_logical_page_recycling_threshold = 4;
 
-            params.m_small_object_bin_page_counts[0]=1000;
-            params.m_small_object_bin_page_counts[1]=1000;
-            params.m_small_object_bin_page_counts[2]=1000;
-            params.m_small_object_bin_page_counts[3]=1000;
-            params.m_small_object_bin_page_counts[4]=1000;
-            params.m_small_object_bin_page_counts[5]=1000;
-            params.m_small_object_bin_page_counts[6]=1000;
-            params.m_small_object_bin_page_counts[7]=1000;
+            params.m_bin_logical_page_counts[0]=1000;
+            params.m_bin_logical_page_counts[1]=1000;
+            params.m_bin_logical_page_counts[2]=1000;
+            params.m_bin_logical_page_counts[3]=1000;
+            params.m_bin_logical_page_counts[4]=1000;
+            params.m_bin_logical_page_counts[5]=1000;
+            params.m_bin_logical_page_counts[6]=1000;
+            params.m_bin_logical_page_counts[7]=1000;
 
             success = m_allocator.create(params, &m_arena);
 

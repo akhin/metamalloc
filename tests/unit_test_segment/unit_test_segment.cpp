@@ -1,7 +1,6 @@
 #include "../unit_test.h" // Always should be the 1st one as it defines UNIT_TEST macro
 
 #include "../../include/logical_page.h"
-#include "../../include/logical_page_anysize.h"
 #include "../../include/arena.h"
 #include "../../include/segment.h"
 
@@ -199,7 +198,6 @@ int main(int argc, char* argv[])
 
     //////////////////////////////////////////////////////////////////////////
     // UNBOUNDED SEGMENT TESTS, LOGICAL PAGE SIZE 64K
-    run_test<LogicalPageAnySize<>>("LogicalPageAnySize", 65536, size_class, logical_page_count_per_segment, 14528, true); // for 128 bytes there is 16 byte alloc header so it is 144 bytes , also 64 bytes page header so 65472 -> 65496 /144 * 32 = 14528
     run_test<LogicalPage<>>("LogicalPage", 65536, size_class, logical_page_count_per_segment, 16352, false); // no padding bytes , 64 bytes page header so 65536-64=65472 , 65472/128=511 , 511*32 = 16352
 
     //////////////////////////////////////////////////////////////////////////
@@ -366,142 +364,6 @@ int main(int argc, char* argv[])
         segment_two.transfer_logical_pages_from(segment_one);
         unit_test.test_equals(segment_one.get_logical_page_count(), 0, "segment logical page transfer", "after transfer , source segment");
         unit_test.test_equals(segment_two.get_logical_page_count(), 8, "segment logical page transfer", "after transfer , destination segment");
-    }
-
-    // DEALLOCATE_FAST , IT CAN ONLY BE USED WHEN LOGICAL PAGE START ADDRESSES ARE ALIGNED TO LOGICAL_PAGE_SIZE
-    {
-        Arena<>  arena;
-        bool success = arena.create(65536 * 10, 65536);
-        if (!success) { std::cout << "ARENA CREATION FAILED !!!" << std::endl; return false; }
-
-        Segment<ConcurrencyPolicy::SINGLE_THREAD, LogicalPageAnySize<>, Arena<>,PageRecyclingPolicy::IMMEDIATE, true> segment;
-        std::vector<std::uint64_t> pointers;
-
-        char* initial_buffer = static_cast <char*>(arena.allocate(65536));
-
-        SegmentCreationParameters params;
-        params.m_size_class = 0;
-        params.m_logical_page_count = 1;
-        params.m_logical_page_size = 65536;
-        params.m_page_recycling_threshold = 1;
-
-        success = segment.create(initial_buffer, &arena, params);
-        if (!success) { std::cout << "Segment creation failed"; return -1; }
-
-        for (std::size_t i = 0; i < 10; i++)
-        {
-            auto ptr = segment.allocate(6500);
-            pointers.push_back(reinterpret_cast<uint64_t>(ptr));
-        }
-
-        auto ptr = segment.allocate(4096); // trigger 2nd page
-        pointers.push_back(reinterpret_cast<uint64_t>(ptr));
-
-        unit_test.test_equals(segment.get_logical_page_count(), 2, "segment auto recycling with aligned logical page addreses", "exhaustion");
-
-        // IF LOGICAL PAGE SIZES IN THE SEGMENT DON'T MEET ALIGNMENT REQUIREMENTS WE WILL CRASH DURING DEALLOCATIONS
-        for (auto ptr : pointers)
-        {
-            segment.deallocate(reinterpret_cast<void*>(ptr)); // Invokes deallocate_from_aligned_logical_page
-        }
-
-        unit_test.test_equals(segment.get_logical_page_count(), 1, "segment auto recycling with aligned logical page addreses", "post recycling");
-    }
-
-    // STRESS TEST
-    {
-        Arena<>  arena;
-        bool success = arena.create(655360, 65536);
-        if (!success) { std::cout << "ARENA CREATION FAILED !!!" << std::endl; return false; }
-
-        Segment<ConcurrencyPolicy::CENTRAL, LogicalPageAnySize<>, Arena<>> segment;
-        std::vector<std::uint64_t> pointers;
-
-        char* initial_buffer = static_cast <char*>(arena.allocate(65536));
-
-        SegmentCreationParameters params;
-        params.m_logical_page_count = 1;
-
-        ///////////////////////////////////////////////
-        params.m_logical_page_size = 655360;
-        params.m_page_recycling_threshold = 1;
-        std::size_t ITERATION_COUNT = 100;
-        bool do_deallocations = true;
-        ///////////////////////////////////////////////
-
-        success = segment.create(initial_buffer, &arena, params); // We start with 1 logical page , and threshold is also 1
-        if (!success) { std::cout << "Segment creation failed"; return -1; }
-
-        void* previous_ptr = nullptr;
-
-        for (std::size_t j = 0; j < ITERATION_COUNT; j++)
-        {
-            for (std::size_t i = 2048; i < 8192; i++)
-            {
-                auto ptr = segment.allocate(i);
-                if (ptr == nullptr)
-                {
-                    std::cout << "allocation failed\n";
-                    return -1;
-                }
-
-                if (previous_ptr)
-                {
-                    if (do_deallocations)
-                    {
-                        segment.deallocate(previous_ptr);
-                    }
-                }
-
-                previous_ptr = ptr;
-            }
-        }
-
-    }
-    
-    // STRESS TEST 2
-    {
-        Arena<> arena;
-        
-        if (arena.create(static_cast<std::size_t>(1024) * 1024 * 1024 * 4, 65536))
-        {
-            Segment < ConcurrencyPolicy::THREAD_LOCAL, LogicalPageAnySize<>, Arena<>> segment;
-            char* buffer = arena.allocate(1024*1024*1024);
-
-            if (buffer)
-            {
-                SegmentCreationParameters params;
-                params.m_deallocation_queue_initial_capacity = 3276800;
-                params.m_grow_coefficient = 2;
-                params.m_logical_page_size = 1024 * 1024 * 512;
-                params.m_logical_page_count = 1;
-                params.m_page_recycling_threshold = 1000;
-
-                if (segment.create(buffer, &arena, params))
-                {
-                    std::vector<void*> pointers;
-                    std::vector<std::size_t> allocation_sizes = { 8192, 8192, 8192, 8192, 8192, 8192, 32768, 32768, 32768, 8192, 8192, 8192, 3456, 8192, 8192, 67108864, 67108864, 20000000, 2400000, 48000000, 2400000, 800000, 4800000, 2400000, 2400000, 800000, 212992 };
-
-                    for (const auto& alloc_size : allocation_sizes)
-                    {
-                        auto ptr = segment.allocate(alloc_size);
-
-                        if (ptr == nullptr)
-                        {
-                            std::cout << "Allocation failed\n";
-                            return -1;
-                        }
-
-                        pointers.push_back(ptr);
-                    }
-
-                    for (const auto& ptr : pointers)
-                    {
-                        segment.deallocate(ptr);
-                    }
-                }
-            }
-        }
     }
 
     ////////////////////////////////////// PRINT THE REPORT

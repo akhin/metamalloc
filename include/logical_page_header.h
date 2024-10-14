@@ -54,6 +54,7 @@ PACKED
 
             void initialise()
             {
+                static_assert(sizeof(LogicalPageHeader) == 64);
                 m_head = 0;
                 m_next_logical_page_ptr = 0;
                 m_prev_logical_page_ptr = 0;

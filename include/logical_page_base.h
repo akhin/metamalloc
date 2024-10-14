@@ -13,6 +13,7 @@ class LogicalPageBase
     public:
         LogicalPageBase()
         {
+            static_assert( sizeof(LogicalPageHeader) % 16 == 0 ); // That is for ensuring that the framework guarantees minimum 16 byte alignment
             m_page_header.initialise();
         }
 
@@ -54,16 +55,11 @@ class LogicalPageBase
 
         #ifdef UNIT_TEST
         const std::string get_type_name() const { return static_cast<LogicalPageImplementation*>(this)->get_type_name(); }
-        std::size_t capacity() const { return m_capacity; }
         NodeType* get_head_node() { return reinterpret_cast<NodeType*>(m_page_header.m_head); };
         #endif
 
     protected:
         LogicalPageHeader m_page_header;
-
-        #ifdef UNIT_TEST
-        std::size_t m_capacity = 0;
-        #endif
 };
 
 #endif

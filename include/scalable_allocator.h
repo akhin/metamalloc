@@ -3,10 +3,9 @@
 
     - ALLOCATIONS INITIALLY WILL BE FROM LOCAL ( EITHER THREAD LOCAL OR CPU LOCAL ) HEAPS. IF LOCAL HEAPS ARE EXHAUSTED , THEN CENTRAL HEAP WILL BE USED.
 
-    - USES CONFIGURABLE METADATA ( DEFAULT 128KB ) TO STORE LOCAL HEAPS.
+    - USES CONFIGURABLE METADATA ( DEFAULT 128KB ) TO STORE LOCAL HEAPS. ALSO INITIALLY USES 64KB METADATA TO STORE VERY BIG SIZED ALLOCATIONS
 
     - YOU HAVE TO MAKE SURE THAT METADATA SIZE WILL BE ABLE TO HANDLE NUMBER OF THREADS IN YOUR APPLICATION.
-
 */
 #ifndef __SCALABLE_ALLOCATOR__H__
 #define __SCALABLE_ALLOCATOR__H__
@@ -22,6 +21,8 @@
 #include "os/virtual_memory.h"
 #include "utilities/multiple_utilities.h"
 #include "utilities/lockable.h"
+#include "utilities/dictionary.h"
+#include "utilities/userspace_spinlock.h"
 #include "arena_base.h"
 #include "heap_base.h"
 
@@ -92,6 +93,18 @@ public:
         {
             return false;
         }
+        
+        if (get_thread_local_heap()->get_max_allocation_size() != m_central_heap.get_max_allocation_size())
+        {
+            return false;
+        }
+        
+        if( m_very_big_object_dict.initialise( 65536 / sizeof(typename Dictionary<uint64_t, std::size_t, typename ArenaType::MetadataAllocator>::DictionaryNode) ) == false)
+        {
+            return false;
+        }
+        
+        m_very_big_object_allocation_lock.initialise();
 
         m_initialised_successfully.store(true);
 
@@ -113,6 +126,15 @@ public:
     void* allocate(const std::size_t size)
     {
         #ifndef ENABLE_DEFAULT_MALLOC
+        if (unlikely( size > m_central_heap.get_max_allocation_size()))
+        {
+            auto ptr = VirtualMemory::allocate<false>(size);
+            m_very_big_object_allocation_lock.lock();
+            m_very_big_object_dict.insert( reinterpret_cast<uint64_t>(ptr), size);
+            m_very_big_object_allocation_lock.unlock();
+            return ptr;
+        }
+        
         void* ret{ nullptr };
         auto local_heap = get_thread_local_heap();
 
@@ -146,6 +168,15 @@ public:
     void* allocate_aligned(std::size_t size, std::size_t alignment)
     {
         #ifndef ENABLE_DEFAULT_MALLOC
+        if (unlikely( size > m_central_heap.get_max_allocation_size()))
+        {
+            auto ptr = VirtualMemory::allocate<false>(size);
+            m_very_big_object_allocation_lock.lock();
+            m_very_big_object_dict.insert( reinterpret_cast<uint64_t>(ptr), size);
+            m_very_big_object_allocation_lock.unlock();
+            return ptr;
+        }
+        
         void* ret{ nullptr };
         auto local_heap = get_thread_local_heap();
 
@@ -183,6 +214,15 @@ public:
             return;
         }
         #ifndef ENABLE_DEFAULT_MALLOC
+        
+        if (unlikely( m_very_big_object_dict.has_key( reinterpret_cast<uint64_t>(ptr) ) ))
+        {
+            std::size_t big_size = 0;
+            m_very_big_object_dict.get(reinterpret_cast<uint64_t>(ptr), big_size);
+            VirtualMemory::deallocate( ptr, big_size);
+            return;
+        }
+        
         // LINEAR SEARCH HOWEVER owns_pointer CHECK IS FAST IN BOUNDED LOCAL HEAPS
         // THEY DON'T DO ANOTHER INTERNAL LINEAR SEARCH THROUGH FREELISTS
         // SO THERE IS NO NESTED LINEAR SEARCHES BUT JUST ONE
@@ -442,6 +482,9 @@ private:
 
     static inline std::atomic<bool> m_initialised_successfully = false;
     static inline std::atomic<bool> m_shutdown_started = false;
+    
+    Dictionary<uint64_t, std::size_t, typename ArenaType::MetadataAllocator> m_very_big_object_dict;
+    UserspaceSpinlock<> m_very_big_object_allocation_lock;
 
     #ifdef UNIT_TEST
     std::size_t m_observed_unique_thread_count = 0;

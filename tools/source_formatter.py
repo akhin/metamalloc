@@ -1,7 +1,7 @@
 #!/usr/bin/python
 '''
     - Converts tabs to 4spaces
-    - Make sure that newlines are '\n' ( so no Windows or Mac)
+    - Makes sure that newlines are just '\n' ( so no Windows or Mac)
 '''
 import os
 import sys

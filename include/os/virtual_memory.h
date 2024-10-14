@@ -7,8 +7,8 @@
                   Reference : https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt )
 
                   ( If THP is enabled , we will use madvise. Otherwise we will use HUGE_TLB flag for mmap.
-                  To check if THP enabled : sudo cat /sys/kernel/mm/transparent_hugepage/enabled
-                  To disable THP : echo never | sudo tee /sys/kernel/mm/transparent_hugepage/enable
+                  To check if THP enabled : cat /sys/kernel/mm/transparent_hugepage/enabled
+                  To disable THP :  echo never | sudo tee /sys/kernel/mm/transparent_hugepage/enabled
                   )
 
         - Windows : SeLockMemoryPrivilege is required.
@@ -187,11 +187,29 @@ class VirtualMemory
         // It affects how we handle allocation of huge pages on Linux
         static bool is_thp_enabled()
         {
-            // Using syscalls to avoid memory allocation
             const char* thp_enabled_file = "/sys/kernel/mm/transparent_hugepage/enabled";
+            
+            if (access(thp_enabled_file, F_OK) != 0)
+            {
+                return false;
+            }
 
-            // Use the access system call to check if the file exists
-            if (access(thp_enabled_file, F_OK) == 0)
+            int fd = open(thp_enabled_file, O_RDONLY);
+            if (fd < 0)
+            {
+                return false;
+            }
+
+            char buffer[256] = {0};
+            ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1);
+            close(fd);
+
+            if (bytes_read <= 0)
+            {
+                return false;
+            }
+
+            if (strstr(buffer, "[always]") != nullptr || strstr(buffer, "[madvise]") != nullptr)
             {
                 return true;
             }

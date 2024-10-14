@@ -2,7 +2,7 @@
 #include "../../include/os/thread_utilities.h"
 
 #include "../../metamalloc.h"
-#include "../../examples/minimal_heap.h"
+#include "../../examples/simple_heap_pow2.h"
 using namespace metamalloc;
 
 #include <array>
@@ -88,8 +88,8 @@ bool validate_allocation(std::size_t allocation_size, std::vector<Allocation>& a
 }
 
 using PerThreadCachingAllocatorType = ScalableAllocator<
-    MinimalHeap<ConcurrencyPolicy::CENTRAL>,       // CENTRAL HEAP
-    MinimalHeap<ConcurrencyPolicy::THREAD_LOCAL>,    // THREAD LOCAL HEAP
+    SimpleHeapPow2<ConcurrencyPolicy::CENTRAL>,       // CENTRAL HEAP
+    SimpleHeapPow2<ConcurrencyPolicy::THREAD_LOCAL>,    // THREAD LOCAL HEAP
     Arena<>
 >;
 
@@ -99,9 +99,8 @@ int main(int argc, char* argv[])
 
     // SANITY TEST FOR SIMPLE HEAP
     {
-        using HeapType = MinimalHeap<ConcurrencyPolicy::SINGLE_THREAD>;
+        using HeapType = SimpleHeapPow2<ConcurrencyPolicy::SINGLE_THREAD>;
         HeapType::HeapCreationParams params;
-        params.total_size = 65536;
 
         Arena<> arena;
         success = arena.create(655360, 65536);
@@ -207,7 +206,16 @@ int main(int argc, char* argv[])
 
         unit_test.test_equals(total_allocated_size, allocation_size * allocation_per_thread_count * thread_count, "scalable allocator", "per thread caching");
 
-        unit_test.test_equals(PerThreadCachingAllocatorType::get_instance().get_observed_unique_thread_count(), thread_count, "scalable allocator", "per thread caching - observed unique thread count");
+        unit_test.test_equals(PerThreadCachingAllocatorType::get_instance().get_observed_unique_thread_count(), thread_count+1, "scalable allocator", "per thread caching - observed unique thread count");
+
+        // HANDLING SIZES WHICH ARE GREATER THAT THE MAX SIZE WHICH IS SUPPORTED BY THE PASSED HEAP
+        auto very_big_ptr = PerThreadCachingAllocatorType::get_instance().allocate(1024*1024*1024); // 1 gb
+        if(validate_buffer(very_big_ptr, 1024*1024*1024) == false)
+        {
+            std::cout << "per thread caching allocator very big sized allocation failed !!!" << std::endl; return -1;
+        }
+
+        PerThreadCachingAllocatorType::get_instance().deallocate(very_big_ptr);
     }
 
     ////////////////////////////////////// PRINT THE REPORT

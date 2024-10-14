@@ -101,7 +101,7 @@ As for 8 core Windows system via DLLs and with 8 threads , each executable makes
 
 ## <a name="usage_and_framework"></a>Usage and framework
 
-You can find example heaps "minimal_heap.h" and "simple_heap_pow2.h" in the examples directory.
+You can find the example heap "simple_heap_pow2.h" in the examples directory.
 
 Once a heap class is ready, to build a thread caching global allocator : 
 
@@ -128,39 +128,26 @@ Check "thread caching global allocator" example in the examples directory to deb
 
 The above example uses SimpleHeapPow2 which is provided as an example heap. You can find it in the examples directory.
 
-SimpleHeapPow2 segregates memory into power-of-two size classes to distribute the pressure :
-
-   | Category                   | Size classes                                                  |
-   | --------------------------|:-------------------------------------------------------------:|
-   | Small objects          | 16,32,64,128,256,512,1024,2048 |
-   | Big  objects      | > 2048                                 |
-   
-You can see the pseudocode of how it works below :
+SimpleHeapPow2 segregates memory into power-of-two size classes to distribute the pressure. You can see the pseudocode of how it works below :
    
 ```plaintext
 
 // A logical page is a basically a freelist. 
 // A segment is a doubly linked list of logical pages/freelists.
-// This example heap is made of 8 segments for small object size classes and 1 segment for anything larger 
-Segment small_objects_bins[8] // 8 = 16 32 64 128 256 512 1024 2048
-Segment big_object
+// This example heap is made of 12 segments each handling one size class
+Segment bins[12] // 12 = 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768
 
 allocation 
-    If allocation size is a small object size 
         Adjust size to the closest greater size class // For ex : 20 becomes 32 , 100 becomes 128 etc
         Allocate from adjusted size's size class bin
-    Else 
-        Allocate from the big object bin
 
 deallocation
-    If pointer does not belong to the big object segment 
         Find size class // The framework does that part by applying bitwise mask on the address, which is equivalent of modulo'ing logical page size
         Deallocate from the found size class's bin
-    Else
-        Deallocate from the big object bin
+
 ```
 
-As the name suggests , SimpleHeapPow2 has minimal segregation. But you can create as many segregations as you need for your application.
+As the name suggests , SimpleHeapPow2 has no further segregations. But you can create as many segregations as you need for your application , for ex: large objects, very large objects, long living objects, short living objects etc.
 
 In case you want to use your heap for single threaded local allocations for critical parts of your software, you can do it by specialising with ConcurrencyPolicy::SINGLE_THREAD :
 
@@ -238,27 +225,15 @@ Thread exit handling : Another common problem in thread caching allocators is ex
 
 - Logical page headers : All logical pages use a 64 byte header.
 - Allocation headers   : class LogicalPage doesn't use allocation headers. class LogicalPageAnySize uses 16 byte allocation header for each allocation.
-- ScalableAllocator : Uses a configurable amount for local heaps. The default is 128 KB.
+- ScalableAllocator : Uses a configurable amount for local heaps. The default is 128 KB. Also uses a 64 KB dictionary to store very big object pointers.
 - Deallocation queues : In thread local policy, each segment uses a 64kb deallocation queue. That number is configurable.
 
 ## <a name="fragmentation"></a>Fragmentation
 
 The fragmentation entirely depends on your use of underlying data structures and layouts you define in your heaps. As for data structures :
 
-1. Same size class logical pages / LogicalPage : In case of example heap SimpleHeapPow2, most objects are using same-size-class logical pages. In that case , there won't be any fragmentation in terms of the holes / unusable memory chunks. However
+Same size class logical pages / LogicalPage : In case of example heap SimpleHeapPow2, most objects are using same-size-class logical pages. In that case , there won't be any fragmentation in terms of the holes / unusable memory chunks. However
 another outcome of it is that if two subsequent allocation requests belong to different size classes, there will be at least 1 logical page size difference in their virtual memory address space.
-
-2. LogicalPageAnySize : There may be fragmentation in terms of holes/unusable chunks. You can enable/disable coalescing with an enum template parameter :
-
-```cpp
-
-enum class CoalescePolicy
-{
-    COALESCE,
-    NO_COALESCING
-};
-
-```
 
 ## <a name="page_recycling"></a>Page recycling
 
@@ -282,14 +257,12 @@ Alternatively to introduce your own recycling policy, you can go with PageRecycl
 That is driven by the last template argument of Segment class "bool aligned_logical_page_addresses". In SimpleHeapPow2 :
 
 ```cpp
-using SegmentSmallObject = Segment <concurrency_policy, SmallObjectLogicalPageType, 
-                                    ArenaType, page_recycling_policy, true>;  //  We place small object logical pages at addresses aligned to logical page sizes so the last template arg is true
+using Segment = Segment <concurrency_policy, LogicalPageType, 
+                                    ArenaType, page_recycling_policy, true>;  //  We place logical pages at addresses aligned to logical page sizes so the last template arg is true
 
-using SegmentBigObject   = Segment <concurrency_policy, BigObjectLogicalPageType,   
-                                    ArenaType, page_recycling_policy, false>; //  But that doesn't apply to the big object segment , so the last template arg is false
 ```
 
-SimpleHeapPow2 initially uses the 2nd method to find out if it is a big object or small object. If it is a small object , then it finds out the size class with the 1st method.
+SimpleHeapPow2 uses the 1st method to find out the correct bin.
 
 ## <a name="huge_page"></a>Huge page usage
 
@@ -303,7 +276,7 @@ On Linux if transparent huge pages are disabled, metamalloc will use the huge pa
 
 - Invalid frees : That means trying to deallocate a pointer which was not allocated by metamalloc. Your application may crash/segfault in this case.
 
-- Allocations returning nullptr : That may happen due to out of memory. Another reason may be that an allocation size exceeds the maximum allocation that your heap can handle. For example , in SimpleHeapPow2 , maximum allocation size is same as big object logical page size. If that is the case , then you will need to use a higher logical page size for your segments that handles the largest sizes. Not every path of every software check allocation failures therefore this may come as a crash or even worse an odd behaviour which doesn't lead to a crash.
+- Allocations returning nullptr : That may happen due to out of memory. Not every path of every software check allocation failures therefore this may come as a crash or even worse an odd behaviour which doesn't lead to a crash.
 
 - Issues with LD_PRELOAD'ed shared object or intercepting DLL : First try to repro the issue with building your app by including metamalloc as a library. If you are unable to repro, then you may need to add more redirections to SO/DLL. You can use ltrace on Linux and APIMonitor on Windows to get a list of those.
 
@@ -341,6 +314,7 @@ After that you navigate to address:port_number in your browser. You can check "m
 
 ## <a name="version_history"></a>Version history
 
+- 1.0.4 : Fixed an issue with deallocations of aligned allocations, added very big object allocation support to Scalable allocator to handle sizes which are not supported by heaps and removing LogicalPageAnysize to simplify the example heap and the framework
 - 1.0.3 : Fixed memlive ui issue ( It was starting sizeclasses wrongly so everything was shifted ), Memlive max capture alloc size is now configurable via a macro, added fast shutdown to ScalableAllocator
 - 1.0.2 : Leak reporting will create "leaks.txt" instead of console outputting, more static asserts, ASLR disabling api
 - 1.0.1 : Refactorings , no functional change
