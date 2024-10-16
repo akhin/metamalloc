@@ -11,30 +11,44 @@
                                     _aligned_free        https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/aligned-free?view=msvc-170
                                     _msize                https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/msize?view=msvc-170
 
-                                    void* operator new(std::size_t size, std::align_val_t alignment)
-                                    void operator delete(void* ptr, std::align_val_t alignment) noexcept
-                                    void* operator new[](std::size_t size, std::align_val_t alignment);
-                                    void operator delete[](void* ptr, std::align_val_t alignment) noexcept;
+                                    OPERATOR NEW AND DELETE
 
-                                    void* operator new(std::size_t size, const std::nothrow_t&) noexcept;
-                                    void operator delete(void* ptr, const std::nothrow_t&) noexcept;
-                                    void* operator new[](std::size_t size, const std::nothrow_t&) noexcept;
-                                    void operator delete[](void* ptr, const std::nothrow_t&) noexcept;
-
-                                    void* operator new(std::size_t size, std::align_val_t align, const std::nothrow_t& tag) noexcept
-                                    void* operator new[](std::size_t size, std::align_val_t align, const std::nothrow_t& tag) noexcept
-
-                                    void operator delete(void* p, std::size_t size) noexcept
-                                    void operator delete[](void* p, std::size_t size) noexcept
-
-                                    void operator delete(void* p, std::size_t size, std::align_val_t align)
-                                    void operator delete[](void* p, std::size_t size, std::align_val_t align)
+                                        void* operator new(std::size_t size)
+                                        void operator delete(void* ptr)
+                                        void* operator new[](std::size_t size)
+                                        void operator delete[](void* ptr) noexcept
+                                        void* operator new(std::size_t size, const std::nothrow_t&) noexcept
+                                        void operator delete(void* ptr, const std::nothrow_t&) noexcept
+                                        void* operator new[](std::size_t size, const std::nothrow_t&) noexcept
+                                        void operator delete[](void* ptr, const std::nothrow_t&) noexcept
+                                        void* operator new(std::size_t size, std::align_val_t alignment)
+                                        void operator delete(void* ptr, std::align_val_t alignment) noexcept
+                                        void* operator new[](std::size_t size, std::align_val_t alignment)
+                                        void operator delete[](void* ptr, std::align_val_t alignment) noexcept
+                                        void* operator new(std::size_t size, std::size_t alignment)
+                                        void* operator new[](std::size_t size, std::size_t alignment)
+                                        void* operator new(std::size_t size, std::align_val_t alignment, const std::nothrow_t& tag) noexcept
+                                        void* operator new[](std::size_t size, std::align_val_t alignment, const std::nothrow_t& tag) noexcept
+                                        void operator delete(void* ptr, std::align_val_t, const std::nothrow_t &) noexcept
+                                        void operator delete[](void* ptr, std::align_val_t, const std::nothrow_t &) noexcept
+                                        void* operator new(std::size_t size, std::size_t alignment, const std::nothrow_t& tag) noexcept
+                                        void* operator new[](std::size_t size, std::size_t alignment, const std::nothrow_t& tag) noexcept
+                                        void operator delete(void* ptr, std::size_t, const std::nothrow_t &) noexcept
+                                        void operator delete[](void* ptr, std::size_t, const std::nothrow_t &) noexcept
+                                        void operator delete(void* ptr, std::size_t size) noexcept
+                                        void operator delete[](void* ptr, std::size_t size) noexcept
+                                        void operator delete(void* ptr, std::size_t size, std::align_val_t align) noexcept
+                                        void operator delete[](void* ptr, std::size_t size, std::align_val_t align) noexcept
+                                        void operator delete(void* ptr, std::size_t size, std::size_t align) noexcept
+                                        void operator delete[](void* ptr, std::size_t size, std::size_t align) noexcept
 
 */
 
 #include <cstddef>
 #include <exception>
 #include <cstdio>
+
+//#define ENABLE_REPORT_INVALID_POINTERS
 #include <metamalloc.h>
 #include <simple_heap_pow2.h>
 

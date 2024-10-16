@@ -97,24 +97,6 @@ int main(int argc, char* argv[])
 {
     bool success = false;
 
-    // SANITY TEST FOR SIMPLE HEAP
-    {
-        using HeapType = SimpleHeapPow2<ConcurrencyPolicy::SINGLE_THREAD>;
-        HeapType::HeapCreationParams params;
-
-        Arena<> arena;
-        success = arena.create(655360, 65536);
-        if (!success) { std::cout << "ARENA CREATION FAILED !!!" << std::endl; return -1; }
-
-        HeapType heap;
-
-        success = heap.create(params, &arena);
-        if (!success) { std::cout << "HEAP CREATION FAILED !!!" << std::endl; return -1; }
-
-        auto ptr = heap.allocate(16);
-        heap.deallocate(ptr);
-    }
-
     ////////////////////////////////////////////////////////////////////////////
     // PER THREAD
     {

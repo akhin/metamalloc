@@ -1,6 +1,6 @@
 PREREQUISITES : GETTING INTEL TBB
 
-		SDK Download address : https://github.com/oneapi-src/oneTBB/releases
+		Download and install IntelOneTBB SDK for includes : https://github.com/oneapi-src/oneTBB/releases
 
 RUNNING THE BENCHMARKS
 
@@ -19,7 +19,3 @@ BUILDING METAMALLOC DLL AND LIB
 		Navigate to "examples/integration-windows_statically_linked_dll" :
 			
 		Run build_msvc.bat file 
-			
-
-
-		

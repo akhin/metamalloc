@@ -38,8 +38,8 @@ PACKED
     }
 );
 
-template <typename NodeType = LogicalPageNode>
-class LogicalPage : public LogicalPageBase<LogicalPage<NodeType>, LogicalPageNode>
+template <bool adjust_padded_pointers = true, typename NodeType = LogicalPageNode>
+class LogicalPage : public LogicalPageBase<LogicalPage<adjust_padded_pointers, NodeType>, LogicalPageNode>
 {
     public:
         LogicalPage() {}
@@ -110,20 +110,36 @@ class LogicalPage : public LogicalPageBase<LogicalPage<NodeType>, LogicalPageNod
             {
                 return;
             }
-
+            
             this->m_page_header.m_used_size -= this->m_page_header.m_size_class;
             
-            /*
-                In case the upper layers handle aligned allocations by overallocating and incrementing the actual pointer, 
+            if constexpr(adjust_padded_pointers == false)
+            {
+                push(static_cast<NodeType*>(ptr));
+            }
+            else
+            {
+                /*
+                In case the upper layers handle aligned allocations by overallocating with padding bytes. 
                 we can find out if that happened and find out original pointer we returned ,
                 since we know that the fixed sizeclass and logical page start address
                 
-                However if the freed ptr was not adjusted, this formula will not change the ptr which is being freed.
+                However if the freed ptr was not adjusted, this formula will not change the ptr which is being freed :
                 
-                    Formula : correct address =  base address + (  sizeclass *  std::floor(   (freed address - base address) / sizeclass  )  )
-             */
-             void* actual_ptr =  reinterpret_cast<void*>( this->m_page_header.m_logical_page_start_address + (this->m_page_header.m_size_class * (static_cast<uint64_t>(std::floor(  ( reinterpret_cast<uint64_t>(ptr) - this->m_page_header.m_logical_page_start_address) / this->m_page_header.m_size_class))) ));
-             push(static_cast<NodeType*>(actual_ptr));
+                    correct address =  base address + (  sizeclass *  floor(   (freed address - base address) / sizeclass  )  )
+                                    or
+                    void* actual_ptr = reinterpret_cast<void*>( this->m_page_header.m_logical_page_start_address + (  (reinterpret_cast<uint64_t>(ptr) - this->m_page_header.m_logical_page_start_address) / this->m_page_header.m_size_class) * this->m_page_header.m_size_class );
+                    
+                Basically we find out the highest multiple of a pow2 sizeclass which is less than the passed pointer with start address offset which is not guaranteed to be pow2
+                    
+                */
+                uint64_t offset = reinterpret_cast<uint64_t>(ptr) - this->m_page_header.m_logical_page_start_address;
+                uint64_t mask = ~( static_cast<uint64_t>(this->m_page_header.m_size_class) - 1);
+                uint64_t unpadded_offset = offset & mask;
+                void* actual_ptr = reinterpret_cast<void*>(this->m_page_header.m_logical_page_start_address + unpadded_offset);
+                
+                push(static_cast<NodeType*>(actual_ptr));
+            }
         }
 
         std::size_t get_usable_size(void* ptr) { return  static_cast<std::size_t>(this->m_page_header.m_size_class); }

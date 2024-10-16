@@ -14,7 +14,7 @@ Note that it can also be used to develop local allocators. You can find those in
 
 The repo also provides another no-dependencies single-header : memlive.h. You can use memlive as a live per-thread allocation profiler. After building your application with it, you can monitor allocations in your browser : 
 
-<img src="images/memlive.gif" alt="Memlive" width="500" height="375">
+<img src="images/memlive.gif" alt="Memlive" width="356" height="371">
 
 - C++17
 
@@ -163,10 +163,12 @@ Here is an overview of the building blocks :
 
 ## <a name="framework_constraints"></a>Framework constraints
 
-1. Minimum allocation alignment guarantee : The framework does not guarantee 16 byte (SSE4.2) alignment for all kinds of allocations by default. In order to achieve it :
+1. Size classes :
 
 - Your minimum size class should not be less than 16 bytes
 - You use only power of two size classes.
+
+That is needed for deallocation lookups where bitwise masks are applied for deallocation lookups and unpadding padded freed ptrs to support aligned allocations. It is als for ensuring minimum allocation alignment guarantee.
 
 2. Contigious memory in thread local heaps : Scalable allocator's deallocate method first tries to find out which heap the pointer belongs to. In the current search method, it assumes each thread local heap has contigious memory. 
 That way framework avoids allocating extra memory for tracking every allocated pointer.
@@ -180,7 +182,11 @@ There are also "integration - linux so ld_preload" and "integration - windows st
 - On the Linux side if you use a shared object, you won't need to rebuild or relink your application. You will only need to use LD_PRELOAD when starting your application. In tests, I was able to LD_PRELOAD Python, GDB and various bash utilities with metamalloc simpleheappow2 shared object on Ubuntu22.04.
 - On the Windows side, there is no equivalent of LD_PRELOAD. You will need to link your application against the DLL. The example DLL uses trampolines to replace CRT memory functions in runtime as LD_PRELOAD is absent. Also the Windows DLL example only intercepts UCRT (ucrtbase.dll). If you are targeting a different CRT version or multiple CRTs, you will need to modify the DLL code.
 
-Note that the examples only cover only the most fundamental memory allocation functions (malloc, free, calloc, realloc, aligned_alloc, '_aligned_malloc', '_aligned_free', malloc_usable_size, '_msize') and all 20 variants of operator new/delete that exist in GNU LibC and MS UCRT binaries. Therefore if your application is using more, you may need to add missing redirections.
+Note that the examples only cover only the most fundamental memory allocation functions (malloc, free, calloc, realloc, aligned_alloc, '_aligned_malloc', '_aligned_free', malloc_usable_size, '_msize') and all variants of operator new/delete. Therefore if your application is using more, you may need to add missing redirections.
+
+Crashes & invalid Pointer detection : This refers to detecting pointers passed to metamalloc functions that were not originally allocated by metamalloc. They can lead to crashes. Typically those will be ScalableAllocator::deallocate and ScalableAllocator::get_usable_size which is called by ScalableAllocator::reallocate.
+
+Metamalloc has an invalid pointer detection utility to find out missing redirections during integration. In order to use it , you need to define '#define ENABLE_REPORT_INVALID_POINTERS' before inclusion of metamalloc.h. And during runtime, if there are any invalid pointers, they will be reported in "invalid_pointers.txt" file.
 
 ## <a name="multithreading"></a>Multithreading
 
@@ -266,7 +272,7 @@ SimpleHeapPow2 uses the 1st method to find out the correct bin.
 
 ## <a name="huge_page"></a>Huge page usage
 
-You can utilise huge pages in Arena template class specialisation. An example for a local allocator is provided in the examples directory. You can also see the local allocator benchmark to observe the difference with huge pages.
+You can utilise 2MB huge pages on Linux and 2MB or 1GB on Windows in Arena template class specialisation. An example for a local allocator is provided in the examples directory. You can also see the local allocator benchmark to observe the difference with huge pages.
 
 On Linux if transparent huge pages are disabled, metamalloc will use the huge page flag during mmap call. If THP is enabled, then it will use madvise.
 
@@ -274,11 +280,7 @@ On Linux if transparent huge pages are disabled, metamalloc will use the huge pa
 
 - Double frees : There are no checks against it. Therefore your application may crash/segfault. You can use address sanitizer to get rid of double frees in your application before integrating metamalloc.
 
-- Invalid frees : That means trying to deallocate a pointer which was not allocated by metamalloc. Your application may crash/segfault in this case.
-
 - Allocations returning nullptr : That may happen due to out of memory. Not every path of every software check allocation failures therefore this may come as a crash or even worse an odd behaviour which doesn't lead to a crash.
-
-- Issues with LD_PRELOAD'ed shared object or intercepting DLL : First try to repro the issue with building your app by including metamalloc as a library. If you are unable to repro, then you may need to add more redirections to SO/DLL. You can use ltrace on Linux and APIMonitor on Windows to get a list of those.
 
 - Valgrind, DrMemory and sanitizers : metamalloc doesn't use their api. Therefore in order to use them. you will need to switch to standard malloc. If you use ENABLE_DEFAULT_MALLOC before including the header , ScalableAlloctor will use the usual malloc. That way you can use Valgrind, Dr.Memory or sanitizers.
 
@@ -312,8 +314,31 @@ After that you navigate to address:port_number in your browser. You can check "m
 
 - The embedded Javascript code has no external dependencies. Therefore you don't need internet connection to make it work.
 
+You can also use it for other custom allocators :
+
+```cpp
+#define MEMLIVE_DISABLE_REDIRECTIONS // Memlive will not redirect standard allocation and deallocation functions 
+
+void* your_custom_allocate_function(std::size_t size)
+{
+    ...
+    memlive::capture_custom_allocation( ptr, size);
+    ...
+    return ptr;
+}
+
+void your_custom_deallocate_function(void* ptr)
+{
+    ...
+    memlive::capture_custom_deallocation( ptr);
+    ...
+}
+
+```
+
 ## <a name="version_history"></a>Version history
 
+- 1.0.5 : Adding invalid pointer reporting to find missing redirections for integrations, improving pointer unpadding perf with bitwise masking, memlive now has a button to save alloc data to files in tabular format , memlive exposes 1 new macro and 2 new functions to support custom allocators
 - 1.0.4 : Fixed an issue with deallocations of aligned allocations, added very big object allocation support to Scalable allocator to handle sizes which are not supported by heaps and removing LogicalPageAnysize to simplify the example heap and the framework
 - 1.0.3 : Fixed memlive ui issue ( It was starting sizeclasses wrongly so everything was shifted ), Memlive max capture alloc size is now configurable via a macro, added fast shutdown to ScalableAllocator
 - 1.0.2 : Leak reporting will create "leaks.txt" instead of console outputting, more static asserts, ASLR disabling api

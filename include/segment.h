@@ -410,6 +410,11 @@ class Segment : public Lockable<LockPolicy::USERSPACE_LOCK>
         #ifdef ENABLE_STATS
         SegmentStats get_stats() { m_stats.m_latest_logical_page_count = m_logical_page_count; return m_stats; }
         #endif
+        
+        std::size_t get_size_class() const
+        {
+            return m_size_class;
+        }
 
     private:
         uint32_t m_size_class = 0;                    // if m_size_class is zero that means, underlying logical page can hold any size

@@ -132,27 +132,27 @@ int main(int argc, char* argv[])
         // CHECK IF WE CAN USE HUGE PAGE IN THE TEST
         if (VirtualMemory::is_huge_page_available())
         {
-            auto huge_page_size = VirtualMemory::get_huge_page_size();
+            auto min_huge_page_size = VirtualMemory::get_minimum_huge_page_size();
 
-            std::cout << "Huge page size on the system : " << huge_page_size << endl;
+            std::cout << "Minimum huge page size on the system : " << min_huge_page_size << endl;
 
-            void* test_ptr = VirtualMemory::allocate<true>(huge_page_size);
+            void* test_ptr = VirtualMemory::allocate<true>(min_huge_page_size);
 
             unit_test.test_equals(test_ptr != nullptr, true, "system virtual memory", "huge page allocation");
 
             if (test_ptr == nullptr) { return -1;}
 
-            VirtualMemory::deallocate(test_ptr, huge_page_size);
+            VirtualMemory::deallocate(test_ptr, min_huge_page_size);
 
             Arena<LockPolicy::USERSPACE_LOCK, VirtualMemoryPolicy::HUGE_PAGE> arena;
-            bool success = arena.create(huge_page_size*2, huge_page_size);
+            bool success = arena.create(min_huge_page_size*2, min_huge_page_size);
             if (!success) { std::cout << "HUGE PAGE ARENA CREATION FAILED !!!" << std::endl; return -1; }
 
-            auto ptr = arena.allocate(huge_page_size);
+            auto ptr = arena.allocate(min_huge_page_size);
 
-            unit_test.test_equals(validate_buffer(ptr, huge_page_size), true, "arena", "huge page");
+            unit_test.test_equals(validate_buffer(ptr, min_huge_page_size), true, "arena", "huge page");
 
-            if (ptr) { arena.release_to_system(ptr, huge_page_size); }
+            if (ptr) { arena.release_to_system(ptr, min_huge_page_size); }
         }
         else
         {

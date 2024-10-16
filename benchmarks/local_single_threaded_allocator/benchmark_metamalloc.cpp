@@ -11,7 +11,8 @@ class MetamallocLocalAllocator
         using HeapType = SimpleHeapPow2<
                         ConcurrencyPolicy::SINGLE_THREAD,
                         Arena<LockPolicy::NO_LOCK>,
-                        PageRecyclingPolicy::DEFERRED>;
+                        PageRecyclingPolicy::DEFERRED,
+                        LogicalPage<false>>;
 
         MetamallocLocalAllocator()
         {

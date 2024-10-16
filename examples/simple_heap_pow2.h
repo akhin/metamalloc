@@ -16,9 +16,10 @@ using namespace metamalloc;
 template <
             ConcurrencyPolicy concurrency_policy = ConcurrencyPolicy::SINGLE_THREAD,
             typename ArenaType = Arena<>,
-            PageRecyclingPolicy page_recycling_policy = PageRecyclingPolicy::IMMEDIATE
+            PageRecyclingPolicy page_recycling_policy = PageRecyclingPolicy::IMMEDIATE,
+            typename LogicalPageType = LogicalPage<>
         >
-class SimpleHeapPow2 : public HeapBase<SimpleHeapPow2<concurrency_policy, ArenaType, page_recycling_policy>, concurrency_policy> // CRTP derivation
+class SimpleHeapPow2 : public HeapBase<SimpleHeapPow2<concurrency_policy, ArenaType, page_recycling_policy, LogicalPageType>, concurrency_policy> // CRTP derivation
 {
     public:
 
@@ -29,7 +30,7 @@ class SimpleHeapPow2 : public HeapBase<SimpleHeapPow2<concurrency_policy, ArenaT
         SimpleHeapPow2& operator= (const SimpleHeapPow2& other) = delete;       
         SimpleHeapPow2& operator=(SimpleHeapPow2&& other) = delete;
 
-        using SegmentType = Segment <concurrency_policy, LogicalPage<>, ArenaType, page_recycling_policy, true>; // The last is true as we place logical pages at "logical page size" aligned addresses
+        using SegmentType = Segment <concurrency_policy, LogicalPageType, ArenaType, page_recycling_policy, true>; // The last is true as we place logical pages at "logical page size" aligned addresses
 
         static constexpr std::size_t MIN_SIZE_CLASS = 16;
         static constexpr std::size_t BIN_COUNT = 12; // 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768

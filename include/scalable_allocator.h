@@ -40,6 +40,10 @@
 #include <cstdio>
 #endif // VOLTRON_EXCLUDE
 
+#ifdef ENABLE_REPORT_INVALID_POINTERS // VOLTRON_EXCLUDE
+#include <cstdio>
+#endif // VOLTRON_EXCLUDE
+
 template <
             typename CentralHeapType,
             typename LocalHeapType,
@@ -105,6 +109,15 @@ public:
         }
         
         m_very_big_object_allocation_lock.initialise();
+        
+        #ifdef ENABLE_REPORT_INVALID_POINTERS
+        if( m_invalid_ptr_detection_dict.initialise( 6553600 / sizeof(typename Dictionary<uint64_t, std::size_t, typename ArenaType::MetadataAllocator>::DictionaryNode) ) == false)
+        {
+            return false;
+        }
+
+        m_invalid_ptr_detection_lock.initialise();
+        #endif
 
         m_initialised_successfully.store(true);
 
@@ -158,6 +171,12 @@ public:
             ret = m_central_heap.allocate(size);
         }
 
+        #ifdef ENABLE_REPORT_INVALID_POINTERS
+        m_invalid_ptr_detection_lock.lock();
+        m_invalid_ptr_detection_dict.insert( reinterpret_cast<uint64_t>(ret), size);
+        m_invalid_ptr_detection_lock.unlock();
+        #endif
+
         return ret;
         #else
         return builtin_aligned_alloc(size, AlignmentConstants::MINIMUM_VECTORISATION_WIDTH);
@@ -200,6 +219,12 @@ public:
             ret = m_central_heap.allocate_aligned(size, alignment);
         }
 
+        #ifdef ENABLE_REPORT_INVALID_POINTERS
+        m_invalid_ptr_detection_lock.lock();
+        m_invalid_ptr_detection_dict.insert( reinterpret_cast<uint64_t>(ret), size);
+        m_invalid_ptr_detection_lock.unlock();
+        #endif
+
         return ret;
         #else
         return builtin_aligned_alloc(size, alignment);
@@ -214,6 +239,13 @@ public:
             return;
         }
         #ifndef ENABLE_DEFAULT_MALLOC
+        
+        #ifdef ENABLE_REPORT_INVALID_POINTERS
+        if(m_invalid_ptr_detection_dict.has_key(reinterpret_cast<uint64_t>(ptr)) == false )
+        {
+            append_to_invalid_pointer_report("deallocate");
+        }
+        #endif
         
         if (unlikely( m_very_big_object_dict.has_key( reinterpret_cast<uint64_t>(ptr) ) ))
         {
@@ -247,6 +279,13 @@ public:
     std::size_t get_usable_size(void* ptr)
     {
         if (ptr == nullptr) return 0;
+        
+        #ifdef ENABLE_REPORT_INVALID_POINTERS
+        if(m_invalid_ptr_detection_dict.has_key(reinterpret_cast<uint64_t>(ptr)) == false )
+        {
+            append_to_invalid_pointer_report("get_usable_size");
+        }
+        #endif
 
         for (std::size_t i = 0; i < m_active_local_heap_count; i++)
         {
@@ -330,6 +369,24 @@ public:
             return true;
         }
         return false;
+    }
+    #endif
+    
+    #ifdef ENABLE_REPORT_INVALID_POINTERS
+    void append_to_invalid_pointer_report(const char* operation)
+    {
+        FILE* report = nullptr;
+        report = fopen("invalid_pointers.txt", "a+"); // does not allocate memory
+
+        if (report) 
+        {
+            fprintf(report, "Invalid pointer ( a pointer which was not allocated by this allocator ) detected during %s call\n", operation);
+            fclose(report);
+        }
+        else
+        {
+            fprintf(stderr, "Failed to open invalid_pointers.txt for writing\n"); // does not allocate memory
+        }
     }
     #endif
 
@@ -497,6 +554,11 @@ private:
 
     #ifdef ENABLE_PERF_TRACES
     std::size_t m_central_heap_hit_count = 0;
+    #endif
+    
+    #ifdef ENABLE_REPORT_INVALID_POINTERS
+    Dictionary<uint64_t, std::size_t, typename ArenaType::MetadataAllocator> m_invalid_ptr_detection_dict;
+    UserspaceSpinlock<> m_invalid_ptr_detection_lock;
     #endif
 
     ScalableAllocator()

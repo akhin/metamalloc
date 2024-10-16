@@ -12,12 +12,13 @@ class MetamallocLocalAllocatorWithHugePage
         using HeapType = SimpleHeapPow2<
                         ConcurrencyPolicy::SINGLE_THREAD,
                         ArenaType,
-                        PageRecyclingPolicy::DEFERRED>;
+                        PageRecyclingPolicy::DEFERRED,
+                        LogicalPage<false>>;
 
         MetamallocLocalAllocatorWithHugePage()
         {
-            auto huge_page_size = VirtualMemory::get_huge_page_size();
-            bool success = m_arena.create(2147483648, huge_page_size);
+            auto minimum_huge_page_size = VirtualMemory::get_minimum_huge_page_size();
+            bool success = m_arena.create(2147483648, minimum_huge_page_size);
 
             if (success == false)
             {
@@ -25,7 +26,7 @@ class MetamallocLocalAllocatorWithHugePage
             }
 
             HeapType::HeapCreationParams params;
-            params.m_logical_page_size = huge_page_size;
+            params.m_logical_page_size = minimum_huge_page_size;
             params.m_logical_page_recycling_threshold = 4;
 
             params.m_bin_logical_page_counts[0]=1;
@@ -67,15 +68,15 @@ int main ()
     if (VirtualMemory::is_huge_page_available() == false)
     {
         #ifdef __linux__
-        std::cout << "Huge page not available. Try to run \"echo 20 | sudo tee /proc/sys/vm/nr_hugepages\" \n";
+        std::cout << "Huge page not available. Try to run \"echo 20 | sudo tee /proc/sys/vm/nr_hugepages\" ( Allocates 20 x 2mb huge pages ) \n";
         #else
         std::cout << "Huge page not available. You need to enable it using gpedit.msc\n";
         #endif
         return -1;
     }
 
-    auto huge_page_size = VirtualMemory::get_huge_page_size();
-    std::cout << "Available huge page size = " <<  huge_page_size << " bytes\n\n";
+    auto min_huge_page_size = VirtualMemory::get_minimum_huge_page_size();
+    std::cout << "Minimum huge page size = " <<  min_huge_page_size << " bytes\n\n";
 
     try
     {

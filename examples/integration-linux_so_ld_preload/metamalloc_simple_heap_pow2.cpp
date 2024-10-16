@@ -4,40 +4,44 @@
 
     LIST OF FUNCTIONS THAT ARE REPLACED :
 
-                                    malloc                https://linux.die.net/man/3/malloc
+                                    malloc              https://linux.die.net/man/3/malloc
                                     free                https://linux.die.net/man/3/free
-                                    realloc                https://linux.die.net/man/3/realloc
-                                    calloc                https://linux.die.net/man/3/calloc
+                                    realloc             https://linux.die.net/man/3/realloc
+                                    calloc              https://linux.die.net/man/3/calloc
 
-                                    aligned_alloc        https://linux.die.net/man/3/aligned_alloc
-                                    malloc_usable_size    https://linux.die.net/man/3/malloc_usable_size
+                                    aligned_alloc       https://linux.die.net/man/3/aligned_alloc
+                                    malloc_usable_size  https://linux.die.net/man/3/malloc_usable_size
 
-                                    64bit GNU LibC operator new variants :
+                                    OPERATOR NEW AND DELETE
 
-                                        void* _Znwm(std::size_t size)
-                                        void* _Znam(std::size_t size)
-                                        void* _Znwmm(std::size_t size, std::size_t alignment)
-                                        void* _Znamm(std::size_t size, std::size_t alignment)
-                                        void* _ZnwmSt11align_val_t(std::size_t size, std::align_val_t alignment)
-                                        void* _ZnamSt11align_val_t(std::size_t size, std::align_val_t alignment)
-                                        void* _ZnwmRKSt9nothrow_t(std::size_t size, std::nothrow_t t)
-                                        void* _ZnamRKSt9nothrow_t(std::size_t size, std::nothrow_t t)
-                                        void* _ZnwmSt11align_val_tRKSt9nothrow_t(std::size_t size, std::align_val_t alignment, std::nothrow_t t)
-                                        void* _ZnamSt11align_val_tRKSt9nothrow_t(std::size_t size, std::align_val_t alignment, std::nothrow_t t)
-
-                                    64bit GNU LibC operator delete variants :
-
-                                        void _ZdlPv(void* ptr)
-                                        void _ZdaPv(void* ptr)
-                                        void _ZdlPvm(void* ptr, std::size_t size) noexcept
-                                        void _ZdlPvSt11nothrow_t(void* ptr, std::nothrow_t t) noexcept
-                                        void _ZdlPvmSt11nothrow_t(void* ptr, std::size_t size, std::nothrow_t t) noexcept
-                                        void _ZdaPvm(void* ptr, std::size_t size) noexcept
-                                        void _ZdaPvSt11nothrow_t(void* ptr, std::nothrow_t) noexcept
-                                        void _ZdaPvmSt11nothrow_t(void* ptr, std::size_t size, std::nothrow_t) noexcept
-                                        void _ZdlPvRKSt9nothrow_t(void* ptr, std::nothrow_t t) noexcept
-                                        void _ZdaPvRKSt9nothrow_t(void* ptr, std::nothrow_t t) noexcept
-
+                                        void* operator new(std::size_t size)
+                                        void operator delete(void* ptr)
+                                        void* operator new[](std::size_t size)
+                                        void operator delete[](void* ptr) noexcept
+                                        void* operator new(std::size_t size, const std::nothrow_t&) noexcept
+                                        void operator delete(void* ptr, const std::nothrow_t&) noexcept
+                                        void* operator new[](std::size_t size, const std::nothrow_t&) noexcept
+                                        void operator delete[](void* ptr, const std::nothrow_t&) noexcept
+                                        void* operator new(std::size_t size, std::align_val_t alignment)
+                                        void operator delete(void* ptr, std::align_val_t alignment) noexcept
+                                        void* operator new[](std::size_t size, std::align_val_t alignment)
+                                        void operator delete[](void* ptr, std::align_val_t alignment) noexcept
+                                        void* operator new(std::size_t size, std::size_t alignment)
+                                        void* operator new[](std::size_t size, std::size_t alignment)
+                                        void* operator new(std::size_t size, std::align_val_t alignment, const std::nothrow_t& tag) noexcept
+                                        void* operator new[](std::size_t size, std::align_val_t alignment, const std::nothrow_t& tag) noexcept
+                                        void operator delete(void* ptr, std::align_val_t, const std::nothrow_t &) noexcept
+                                        void operator delete[](void* ptr, std::align_val_t, const std::nothrow_t &) noexcept
+                                        void* operator new(std::size_t size, std::size_t alignment, const std::nothrow_t& tag) noexcept
+                                        void* operator new[](std::size_t size, std::size_t alignment, const std::nothrow_t& tag) noexcept
+                                        void operator delete(void* ptr, std::size_t, const std::nothrow_t &) noexcept
+                                        void operator delete[](void* ptr, std::size_t, const std::nothrow_t &) noexcept
+                                        void operator delete(void* ptr, std::size_t size) noexcept
+                                        void operator delete[](void* ptr, std::size_t size) noexcept
+                                        void operator delete(void* ptr, std::size_t size, std::align_val_t align) noexcept
+                                        void operator delete[](void* ptr, std::size_t size, std::align_val_t align) noexcept
+                                        void operator delete(void* ptr, std::size_t size, std::size_t align) noexcept
+                                        void operator delete[](void* ptr, std::size_t size, std::size_t align) noexcept
 */
 #include <cstddef>
 #include <cstdarg>
@@ -46,6 +50,7 @@
 #include <cstring>
 #include <new>
 
+//#define ENABLE_REPORT_INVALID_POINTERS
 //#define ENABLE_TRACER
 #include <metamalloc.h>
 #include <simple_heap_pow2.h>
@@ -178,108 +183,233 @@ std::size_t malloc_usable_size(void* ptr)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 64bit Operator new variants
-void* _Znwm(std::size_t size)
-{
-    return ScalableAllocatorType::get_instance().operator_new(size);
-}
-
-void* _Znam(std::size_t size)
-{
-    return ScalableAllocatorType::get_instance().operator_new(size);
-}
-
-void* _Znwmm(std::size_t size, std::size_t alignment)
-{
-    return ScalableAllocatorType::get_instance().operator_new_aligned(size, alignment);
-}
-
-void* _Znamm(std::size_t size, std::size_t alignment)
-{
-    return ScalableAllocatorType::get_instance().operator_new_aligned(size, alignment);
-}
-
-void* _ZnwmSt11align_val_t(std::size_t size, std::align_val_t alignment)
-{
-    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
-}
-
-void* _ZnamSt11align_val_t(std::size_t size, std::align_val_t alignment)
-{
-    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
-}
-
-void* _ZnwmRKSt9nothrow_t(std::size_t size, std::nothrow_t t)
-{
-    return ScalableAllocatorType::get_instance().allocate(size);
-}
-
-void* _ZnamRKSt9nothrow_t(std::size_t size, std::nothrow_t t)
-{
-    return ScalableAllocatorType::get_instance().allocate(size);
-}
-
-void* _ZnwmSt11align_val_tRKSt9nothrow_t(std::size_t size, std::align_val_t alignment, std::nothrow_t t)
-{
-    return ScalableAllocatorType::get_instance().allocate_aligned(size, static_cast<std::size_t>(alignment));
-}
-
-void* _ZnamSt11align_val_tRKSt9nothrow_t(std::size_t size, std::align_val_t alignment, std::nothrow_t t)
-{
-    return ScalableAllocatorType::get_instance().allocate_aligned(size, static_cast<std::size_t>(alignment));
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 64bit Operator delete variants
-void _ZdlPv(void* ptr)
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdaPv(void* ptr)
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdlPvm(void* ptr, std::size_t size) noexcept
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdlPvSt11nothrow_t(void* ptr, std::nothrow_t t) noexcept
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdlPvmSt11nothrow_t(void* ptr, std::size_t size, std::nothrow_t t) noexcept
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdaPvm(void* ptr, std::size_t size) noexcept
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdaPvSt11nothrow_t(void* ptr, std::nothrow_t) noexcept
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdaPvmSt11nothrow_t(void* ptr, std::size_t size, std::nothrow_t) noexcept
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdlPvRKSt9nothrow_t(void* ptr, std::nothrow_t t) noexcept
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-void _ZdaPvRKSt9nothrow_t(void* ptr, std::nothrow_t t) noexcept
-{
-    ScalableAllocatorType::get_instance().deallocate(ptr);
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 } // extern "C"
+
+///////////////////////////////////////////////////////////////////////
+// USUAL OVERLOADS
+void* operator new(std::size_t size)
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new(size);
+}
+
+void operator delete(void* ptr)
+{
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void* operator new[](std::size_t size)
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new(size);
+}
+
+void operator delete[](void* ptr) noexcept
+{
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+///////////////////////////////////////////////////////////////////////
+// WITH std::nothrow_t
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new(size);
+}
+
+void operator delete(void* ptr, const std::nothrow_t&) noexcept
+{
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void* operator new[](std::size_t size, const std::nothrow_t&) noexcept
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new(size);
+}
+
+void operator delete[](void* ptr, const std::nothrow_t&) noexcept
+{
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+///////////////////////////////////////////////////////////////////////
+// WITH ALIGNMENT
+void* operator new(std::size_t size, std::align_val_t alignment)
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
+}
+
+void operator delete(void* ptr, std::align_val_t alignment) noexcept
+{
+    UNUSED(alignment);
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void* operator new[](std::size_t size, std::align_val_t alignment)
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
+}
+
+void operator delete[](void* ptr, std::align_val_t alignment) noexcept
+{
+    UNUSED(alignment);
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+///////////////////////////////////////////////////////////////////////
+// WITH ALIGNMENT std::size_t
+void* operator new(std::size_t size, std::size_t alignment)
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
+}
+
+
+void* operator new[](std::size_t size, std::size_t alignment)
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
+}
+
+///////////////////////////////////////////////////////////////////////
+// WITH ALIGNMENT and std::nothrow_t
+
+void* operator new(std::size_t size, std::align_val_t alignment, const std::nothrow_t& tag) noexcept
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
+}
+
+void* operator new[](std::size_t size, std::align_val_t alignment, const std::nothrow_t& tag) noexcept
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
+}
+
+void operator delete(void* ptr, std::align_val_t, const std::nothrow_t &) noexcept
+{
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void operator delete[](void* ptr, std::align_val_t, const std::nothrow_t &) noexcept
+{
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+///////////////////////////////////////////////////////////////////////
+// WITH ALIGNMENT and std::nothrow_t   STD::SIZE_T not std::align_val_t
+
+void* operator new(std::size_t size, std::size_t alignment, const std::nothrow_t& tag) noexcept
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
+}
+
+void* operator new[](std::size_t size, std::size_t alignment, const std::nothrow_t& tag) noexcept
+{
+    if(unlikely(shared_object_loaded == false))
+    {
+        initialise_shared_object();
+    }
+    
+    return ScalableAllocatorType::get_instance().operator_new_aligned(size, static_cast<std::size_t>(alignment));
+}
+
+void operator delete(void* ptr, std::size_t, const std::nothrow_t &) noexcept
+{
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void operator delete[](void* ptr, std::size_t, const std::nothrow_t &) noexcept
+{
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+///////////////////////////////////////////////////////////////////////
+// DELETES WITH SIZES
+void operator delete(void* ptr, std::size_t size) noexcept
+{
+    UNUSED(size);
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void operator delete[](void* ptr, std::size_t size) noexcept
+{
+    UNUSED(size);
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void operator delete(void* ptr, std::size_t size, std::align_val_t align) noexcept
+{
+    UNUSED(size);
+    UNUSED(align);
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void operator delete[](void* ptr, std::size_t size, std::align_val_t align) noexcept
+{
+    UNUSED(size);
+    UNUSED(align);
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void operator delete(void* ptr, std::size_t size, std::size_t align) noexcept
+{
+    UNUSED(size);
+    UNUSED(align);
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}
+
+void operator delete[](void* ptr, std::size_t size, std::size_t align) noexcept
+{
+    UNUSED(size);
+    UNUSED(align);
+    ScalableAllocatorType::get_instance().deallocate(ptr);
+}

@@ -1,9 +1,9 @@
 /*
-    - To work with huge pages , you may need to configure your system :
+    - To work with 2MB huge pages on Linux and  2MB or 1 GB huge pages on Windows , you may need to configure your system :
 
         - Linux : /proc/meminfo should have non-zero "Hugepagesize" & "HugePages_Total/HugePages_Free" attributes
                   ( If HugePages_Total or HugePages_Free  is 0
-                  then run "echo 20 | sudo tee /proc/sys/vm/nr_hugepages" to reserve huge pages
+                  then run "echo 20 | sudo tee /proc/sys/vm/nr_hugepages" ( Allocates 20 x 2MB huge pages )
                   Reference : https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt )
 
                   ( If THP is enabled , we will use madvise. Otherwise we will use HUGE_TLB flag for mmap.
@@ -82,19 +82,19 @@ class VirtualMemory
         {
             bool ret{ false };
             #ifdef __linux__
-            if (get_huge_page_size() <= 0)
+            if (get_minimum_huge_page_size() <= 0)
             {
                 ret = false;
             }
             else
             {
-                if ( get_huge_page_total_count() > 0 )
+                if ( get_huge_page_total_count_2mb() > 0 )
                 {
                     ret = true;
                 }
             }
             #elif _WIN32
-            auto huge_page_size = get_huge_page_size();
+            auto huge_page_size = get_minimum_huge_page_size();
 
             if (huge_page_size)
             {
@@ -130,7 +130,7 @@ class VirtualMemory
             return ret;
         }
 
-        static std::size_t get_huge_page_size()
+        static std::size_t get_minimum_huge_page_size()
         {
             std::size_t ret{ 0 };
             #ifdef __linux__
@@ -143,7 +143,7 @@ class VirtualMemory
 
         #ifdef __linux__
         // Equivalent of /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-        static std::size_t get_huge_page_total_count()
+        static std::size_t get_huge_page_total_count_2mb()
         {
             auto ret = get_proc_mem_info("HugePages_Total", 16);
             if(ret == 0 )

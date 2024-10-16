@@ -33,7 +33,11 @@ int main()
     //////////////////////////////////////////////////////////////////////
     // START
 
-    memlive::start("127.0.0.1", port);
+    if ( memlive::start("127.0.0.1", port) == false )
+    {
+        cout << "Memlive start failed\n";
+        return -1;
+    }
 
     cout << "In your browser , navigate to localhost:" << port << endl;
 
